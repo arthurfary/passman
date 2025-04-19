@@ -1,3 +1,7 @@
+mod file_encryption;
+
+use std::str::FromStr;
+
 use argon2::Argon2;
 use argon2::password_hash::rand_core::RngCore;
 use base64::prelude::*;
@@ -10,9 +14,9 @@ use chacha20poly1305::{ChaCha20Poly1305, Key};
 
 fn main() {
     // setting salt and pass manualy here for testing
-    let pass = b"test";
+    let pass = b"password";
     // let salt = b"randomsalt";
-    let message = b"test message";
+    let message = b"service:github\npass:dummypass";
 
     // random salt
     let mut random_salt = [0u8; 16];
@@ -47,6 +51,10 @@ fn main() {
         "TEXT THAT WILL GO IN FILE:\nSALT: {}\nCONTENT:{}",
         b64_salt, b64_text
     );
+    // -------------
+    // THIS PART IS FOR THE FILE ENCRYPTION
+    file_encryption::create_encrypted_file("test", &b64_salt, &nonce, &cyphertext);
+    // -------------
 
     let mut key_bytes_decrypt = [0u8; 32];
     if let Err(e) = Argon2::default().hash_password_into(pass, &random_salt, &mut key_bytes_decrypt)
