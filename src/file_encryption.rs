@@ -3,25 +3,26 @@ use chacha20poly1305::aead::generic_array::GenericArray;
 use std::fs::File;
 use std::io::prelude::*;
 
-use argon2::Argon2;
-use argon2::password_hash::rand_core::RngCore;
-use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng};
-use chacha20poly1305::{ChaCha20Poly1305, ChaChaPoly1305, Key};
+use chacha20poly1305::aead::Aead;
 
 use crate::error::PassmanError;
+use crate::passman_encryption;
 
 pub fn create_encrypted_file(
     filename: &str,
-    salt_bytes: &[u8],
-    nonce: &[u8],
-    content_bytes: &[u8],
+    pwd: &str,
+    content: &[u8],
 ) -> Result<(), PassmanError> {
     let mut file = File::create(filename)?;
 
+    let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
+
+    let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
+
     // Encode everything with base64
-    let salt_b64 = BASE64_STANDARD.encode(salt_bytes);
+    let salt_b64 = BASE64_STANDARD.encode(salt);
     let nonce_b64 = BASE64_STANDARD.encode(nonce);
-    let content_b64 = BASE64_STANDARD.encode(content_bytes);
+    let content_b64 = BASE64_STANDARD.encode(encrypted_content);
 
     // Write to file with minimal headers
     let file_content = format!("S:{}\nN:{}\nC:{}", salt_b64, nonce_b64, content_b64);
@@ -30,7 +31,7 @@ pub fn create_encrypted_file(
     Ok(())
 }
 
-pub fn decrypt_file(filename: &str, pass: &[u8]) -> Result<(), PassmanError> {
+pub fn decrypt_file(filename: &str, pass: &[u8]) -> Result<String, PassmanError> {
     let mut file = File::open(filename)?;
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)?;
@@ -46,15 +47,12 @@ pub fn decrypt_file(filename: &str, pass: &[u8]) -> Result<(), PassmanError> {
     // convert nonce to generic array
     let nonce = GenericArray::clone_from_slice(&nonce);
 
-    let mut decrypt_key = [0u8; 32];
+    let decrypt_cipher = passman_encryption::gen_decrypt_cipher(pass, &salt)?;
 
-    Argon2::default().hash_password_into(pass, &salt, &mut decrypt_key)?;
-    let decrypt_cipher = ChaCha20Poly1305::new(Key::from_slice(&decrypt_key));
-
+    //TODO: need to find a way of handeling wrong pass
     let decrypted_content = decrypt_cipher.decrypt(&nonce, content.as_ref())?;
 
-    let decrypted_text = &String::from_utf8(decrypted_content).map_err(PassmanError::Utf8Error)?;
-    println!("Decrypted: {}", decrypted_text);
+    let decrypted_text = String::from_utf8(decrypted_content).map_err(PassmanError::Utf8Error)?;
 
-    Ok(())
+    Ok(decrypted_text)
 }
