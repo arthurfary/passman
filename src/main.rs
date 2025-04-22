@@ -1,49 +1,95 @@
 mod error;
 mod file_encryption;
 mod passman_encryption;
-
 use error::PassmanError;
+use rand::{Rng, rng};
+use std::env;
+use std::io::{self, Write};
+
+fn print_usage() {
+    println!("Password Manager CLI");
+    println!("Usage:");
+    println!("  create    - Create new password for a service");
+    println!("  register  - Register existing password for a service");
+    println!("  change    - Change password for a service");
+    println!("  help      - Show this help message\n");
+    println!("Examples:");
+    println!("  passman create");
+    println!("  passman register");
+    println!("  passman change");
+}
+
+fn read_input(prompt: &str) -> String {
+    print!("{}: ", prompt);
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    input.trim().to_string()
+}
+
+fn read_password(prompt: &str) -> String {
+    print!("{}: ", prompt);
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    input.trim().to_string()
+}
+
+fn create_random_password(length: usize) -> String {
+    const CHARSET: &[u8] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~`!@#$%^&*()_-+={[}]|\\:;\"'<,>.?/";
+    let mut rng = rng();
+
+    (0..length)
+        .map(|_| {
+            let idx = rng.random_range(0..CHARSET.len());
+            char::from(CHARSET[idx])
+        })
+        .collect()
+}
+
+fn create_password() -> Result<(), PassmanError> {
+    Ok(())
+}
+
+fn get_password() -> Result<(), PassmanError> {
+    let master_pwd = read_password("Enter master password");
+    let service_name = read_input("Enter service name");
+
+    Ok(())
+}
+
+fn register_password() -> Result<(), PassmanError> {
+    Ok(())
+}
+
+fn change_password() -> Result<(), PassmanError> {
+    Ok(())
+}
 
 fn main() -> Result<(), PassmanError> {
-    let mut pwd = String::new();
-    let mut service_name = String::new();
-    let mut service_pwd = String::new();
+    let args: Vec<String> = env::args().collect();
 
-    println!("Enter master pass:");
-    std::io::stdin().read_line(&mut pwd).unwrap();
+    if args.len() < 2 {
+        print_usage();
+        return Ok(());
+    }
 
-    println!("Enter service_name:");
-    std::io::stdin().read_line(&mut service_name).unwrap();
-
-    println!("Enter service_pwd:");
-    std::io::stdin().read_line(&mut service_pwd).unwrap();
-
-    // Trim newlines and whitespace
-    let pwd = pwd.trim();
-    let service_name = service_name.trim();
-    let service_pwd = service_pwd.trim();
-
-    file_encryption::create_encrypted_file(
-        service_name,
-        pwd,
-        service_name,
-        service_pwd.as_bytes(),
-    )?;
-
-    // DECRYPT
-    let mut pass = String::new();
-
-    println!("Enter master pass:");
-
-    std::io::stdin().read_line(&mut pass).unwrap();
-
-    let pass = pass.trim();
-
-    println!("mp: {}", &pass);
-
-    let (service_name, content_str) = file_encryption::read_encrypted_file(service_name, pass)?;
-
-    println!("{}: {}", service_name, content_str);
+    match args[1].as_str() {
+        "create" => create_password()?,
+        "get" => get_password()?,
+        "register" => register_password()?,
+        "change" => change_password()?,
+        "help" => {
+            print_usage();
+            return Ok(());
+        }
+        _ => {
+            println!("Unknown command: {}", args[1]);
+            print_usage();
+            return Ok(());
+        }
+    }
 
     Ok(())
 }
