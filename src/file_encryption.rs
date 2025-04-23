@@ -1,6 +1,6 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
-use std::fs::{File, read_to_string};
+use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
 
 use chacha20poly1305::aead::Aead;
@@ -8,13 +8,18 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
+const OUTPUT_PATH: &str = "./test/";
+
 pub fn create_encrypted_file(
     filename: &str,
     pwd: &str,
     service_name: &str,
     content: &[u8],
 ) -> Result<(), PassmanError> {
-    let mut file = File::create(filename)?;
+    // creates path if it doesnt exist
+    create_dir_all(OUTPUT_PATH).unwrap();
+
+    let mut file = File::create(OUTPUT_PATH.to_owned() + filename)?;
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
     let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
 
