@@ -3,10 +3,10 @@ mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, RngCore, rng};
-use std::env;
 use std::fs::read;
 use std::future::poll_fn;
 use std::io::{self, Write};
+use std::{env, fs};
 
 fn print_usage() {
     println!("Password Manager CLI");
@@ -14,6 +14,8 @@ fn print_usage() {
     println!("  new       - Create new password for a service");
     println!("  register  - Register existing password for a service");
     println!("  change    - Change password for a service");
+    println!("  list      - List all passwords files in password folder");
+    println!("  dlist     - Decrypt all");
     println!("  help      - Show this help message\n");
     println!("Examples:");
     println!("  passman create");
@@ -93,6 +95,23 @@ fn get_password() -> Result<(), PassmanError> {
     let master_pwd = read_password("Enter master password");
     let service_name = read_input("Enter service name");
 
+    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH.to_owned()).unwrap();
+
+    for file in password_files {
+        let (file_service_name, service_password) = file_encryption::read_encrypted_file(
+            //FIXME: remove unwrap spam
+            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
+            &master_pwd,
+        )?;
+        if file_service_name == service_name {
+            println!("{}: {}", service_name, service_password);
+            return Ok(());
+        }
+    }
+
+    // no service found
+    println!("No service of name {} in passwords.", service_name);
+
     Ok(())
 }
 
@@ -101,6 +120,60 @@ fn register_password() -> Result<(), PassmanError> {
 }
 
 fn change_password() -> Result<(), PassmanError> {
+    Ok(())
+}
+
+fn list_files() -> Result<(), PassmanError> {
+    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH.to_owned()).unwrap();
+
+    for file in password_files {
+        println!("{}", file.unwrap().path().display())
+    }
+
+    Ok(())
+}
+
+fn list_service_names() -> Result<(), PassmanError> {
+    let master_pwd = read_password("Enter master password");
+
+    // Read all files in the directory
+    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH.to_owned()).unwrap();
+
+    // Create a vector to store service names
+    let mut service_names: Vec<(String, String)> = Vec::new();
+
+    // Process each file
+    for file in password_files {
+        let (file_service_name, service_password) = file_encryption::read_encrypted_file(
+            //FIXME: remove unwrap spam
+            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
+            &master_pwd,
+        )?;
+        service_names.push((file_service_name, service_password));
+    }
+
+    // Print the service names
+    if service_names.is_empty() {
+        println!("No services found.");
+    } else {
+        println!("Available services:");
+        for name_password in service_names {
+            println!("{}: {}", name_password.0, name_password.1);
+        }
+    }
+
+    Ok(())
+}
+
+fn decrypt_file_prompt() -> Result<(), PassmanError> {
+    let master_pwd = read_password("Master Password:");
+    let filename = read_input("File to decrypt:");
+
+    let (service_name, service_password) =
+        file_encryption::read_encrypted_file(&filename, &master_pwd)?;
+
+    println!("{}: {}", service_name, service_password);
+
     Ok(())
 }
 
@@ -115,8 +188,11 @@ fn main() -> Result<(), PassmanError> {
     match args[1].as_str() {
         "new" => create_new_password()?,
         "get" => get_password()?,
+        "decrypt" => decrypt_file_prompt()?,
         "register" => register_password()?,
         "change" => change_password()?,
+        "dall" => list_service_names()?,
+        "list" => list_files()?,
         "help" => {
             print_usage();
             return Ok(());

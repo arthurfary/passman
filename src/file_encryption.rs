@@ -1,6 +1,6 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
-use std::fs::{File, create_dir_all, read_to_string};
+use std::fs::{File, ReadDir, create_dir_all, read_to_string};
 use std::io::prelude::*;
 
 use chacha20poly1305::aead::Aead;
@@ -8,7 +8,7 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
-const OUTPUT_PATH: &str = "./test/";
+pub const OUTPUT_PATH: &str = "./test/";
 
 pub fn create_encrypted_file(
     filename: &str,
@@ -40,7 +40,7 @@ pub fn create_encrypted_file(
 }
 
 pub fn read_encrypted_file(filename: &str, pwd: &str) -> Result<(String, String), PassmanError> {
-    let content = read_to_string(filename)?;
+    let content = read_to_string(OUTPUT_PATH.to_owned() + filename)?;
     let parts: Vec<&str> = content.split('|').collect();
 
     // Decode from base64
