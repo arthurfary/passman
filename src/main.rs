@@ -4,6 +4,8 @@ mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, rng};
 use std::env;
+use std::fs::read;
+use std::future::poll_fn;
 use std::io::{self, Write};
 
 fn print_usage() {
@@ -48,7 +50,27 @@ fn create_random_password(length: usize) -> String {
         .collect()
 }
 
-fn create_password() -> Result<(), PassmanError> {
+fn create_new_password() -> Result<(), PassmanError> {
+    let master_pwd = read_password("Master password:");
+    let service_name = read_input("Service name:");
+    let random_pass = create_random_password(16);
+
+    println!("{}", random_pass);
+
+    let gen_random_name = read_input("Generate random name? ([y]/n)");
+
+    if gen_random_name != "n" {
+        println!()
+    } else {
+    }
+
+    file_encryption::create_encrypted_file(
+        filename,
+        &master_pwd,
+        &service_name,
+        random_pass.as_bytes(),
+    );
+
     Ok(())
 }
 
@@ -76,7 +98,7 @@ fn main() -> Result<(), PassmanError> {
     }
 
     match args[1].as_str() {
-        "create" => create_password()?,
+        "new" => create_new_password()?,
         "get" => get_password()?,
         "register" => register_password()?,
         "change" => change_password()?,
