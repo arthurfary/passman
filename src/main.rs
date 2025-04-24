@@ -2,7 +2,7 @@ mod error;
 mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
-use rand::{Rng, RngCore, rng};
+use rand::{Rng, rng};
 use std::io::{self, Write};
 use std::{env, fs};
 

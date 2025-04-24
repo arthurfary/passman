@@ -1,6 +1,6 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
-use std::fs::{File, ReadDir, create_dir_all, read_to_string};
+use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
 
 use chacha20poly1305::aead::Aead;
