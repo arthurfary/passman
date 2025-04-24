@@ -71,7 +71,6 @@ fn create_new_password(service_name: String) -> Result<(), PassmanError> {
 
     Ok(())
 }
-
 fn get_password(service_name: String) -> Result<(), PassmanError> {
     let master_pwd = read_input("Enter master password", false);
 
@@ -85,8 +84,7 @@ fn get_password(service_name: String) -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) = file_encryption::read_encrypted_file(
-            //FIXME: remove unwrap spam
-            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
+            &file?.file_name().to_string_lossy(),
             &master_pwd,
         )?;
         if file_service_name == service_name {
@@ -155,8 +153,7 @@ fn list_service_names() -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) = file_encryption::read_encrypted_file(
-            //FIXME: remove unwrap spam
-            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
+            &file?.file_name().to_string_lossy(),
             &master_pwd,
         )?;
         service_names.push((file_service_name, service_password));
