@@ -9,6 +9,7 @@ use std::{env, fs};
 //TODO:
 // - Find a better way of handeling the master password (Should be a parameter probably)
 // - Astract awaya all logic that doesn't need to be in this main, cli file
+// - Find a better way of handeling user input (same bit of code repeation)
 
 fn read_input(prompt: &str, is_pass: bool) -> String {
     print!("{}: ", prompt);
