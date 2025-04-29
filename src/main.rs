@@ -3,6 +3,7 @@ mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, rng};
+use std::ffi::OsString;
 use std::io::{self, Write};
 use std::{env, fs};
 
@@ -61,7 +62,7 @@ fn create_new_password(service_name: String) -> Result<(), PassmanError> {
     };
 
     file_encryption::create_encrypted_file(
-        &filename,
+        &OsString::from(&filename),
         &master_pwd,
         &service_name,
         random_pass.as_bytes(),
@@ -71,7 +72,6 @@ fn create_new_password(service_name: String) -> Result<(), PassmanError> {
 
     Ok(())
 }
-
 fn get_password(service_name: String) -> Result<(), PassmanError> {
     let master_pwd = read_input("Enter master password", false);
 
@@ -81,14 +81,11 @@ fn get_password(service_name: String) -> Result<(), PassmanError> {
         service_name
     };
 
-    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH).unwrap();
+    let password_files = fs::read_dir(file_encryption::get_output_path()).unwrap();
 
     for file in password_files {
-        let (file_service_name, service_password) = file_encryption::read_encrypted_file(
-            //FIXME: remove unwrap spam
-            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
-            &master_pwd,
-        )?;
+        let (file_service_name, service_password) =
+            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
         if file_service_name == service_name {
             println!("{}: {}", service_name, service_password);
             return Ok(());
@@ -125,7 +122,7 @@ fn register_password(service_name: String, service_pwd: String) -> Result<(), Pa
     };
 
     file_encryption::create_encrypted_file(
-        &filename,
+        &OsString::from(&filename),
         &master_pwd,
         &service_name,
         service_pwd.as_bytes(),
@@ -137,7 +134,7 @@ fn register_password(service_name: String, service_pwd: String) -> Result<(), Pa
 }
 
 fn list_files() -> Result<(), PassmanError> {
-    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH).unwrap();
+    let password_files = fs::read_dir(file_encryption::get_output_path()).unwrap();
 
     for file in password_files {
         println!("{}", file.unwrap().path().display())
@@ -149,16 +146,13 @@ fn list_files() -> Result<(), PassmanError> {
 fn list_service_names() -> Result<(), PassmanError> {
     let master_pwd = read_input("Enter master password", true);
 
-    let password_files = fs::read_dir(file_encryption::OUTPUT_PATH).unwrap();
+    let password_files = fs::read_dir(file_encryption::get_output_path()).unwrap();
 
     let mut service_names: Vec<(String, String)> = Vec::new();
 
     for file in password_files {
-        let (file_service_name, service_password) = file_encryption::read_encrypted_file(
-            //FIXME: remove unwrap spam
-            &file.unwrap().path().file_name().unwrap().to_str().unwrap(),
-            &master_pwd,
-        )?;
+        let (file_service_name, service_password) =
+            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
         service_names.push((file_service_name, service_password));
     }
 
@@ -184,7 +178,7 @@ fn decrypt_file_prompt(filename: String) -> Result<(), PassmanError> {
     };
 
     let (service_name, service_password) =
-        file_encryption::read_encrypted_file(&filename, &master_pwd)?;
+        file_encryption::read_encrypted_file(&OsString::from(filename), &master_pwd)?;
 
     println!("{}: {}", service_name, service_password);
 
