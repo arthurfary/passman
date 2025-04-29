@@ -1,25 +1,49 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
+use std::env;
+use std::ffi::OsString;
 use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
+use std::path::PathBuf;
 
 use chacha20poly1305::aead::Aead;
 
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
-pub const OUTPUT_PATH: &str = "./test/";
+pub fn get_output_path() -> OsString {
+    let home = if cfg!(windows) {
+        env::var_os("USERPROFILE")
+    } else {
+        env::var_os("HOME")
+    }
+    .unwrap_or_default();
+
+    let mut path = OsString::from(home);
+
+    if cfg!(windows) {
+        path.push(PathBuf::from("\\Documents\\Passwords\\"));
+    } else {
+        path.push(PathBuf::from("/.passwords/"));
+    }
+
+    path
+}
 
 pub fn create_encrypted_file(
-    filename: &str,
+    filename: &OsString,
     pwd: &str,
     service_name: &str,
     content: &[u8],
 ) -> Result<(), PassmanError> {
     // creates path if it doesnt exist
-    create_dir_all(OUTPUT_PATH).unwrap();
+    create_dir_all(get_output_path()).unwrap();
 
-    let mut file = File::create(OUTPUT_PATH.to_owned() + filename)?;
+    let mut file_path = OsString::new();
+    file_path.push(get_output_path());
+    file_path.push(filename);
+
+    let mut file = File::create(file_path)?;
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
     let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
 
@@ -39,8 +63,15 @@ pub fn create_encrypted_file(
     Ok(())
 }
 
-pub fn read_encrypted_file(filename: &str, pwd: &str) -> Result<(String, String), PassmanError> {
-    let content = read_to_string(OUTPUT_PATH.to_owned() + filename)?;
+pub fn read_encrypted_file(
+    filename: &OsString,
+    pwd: &str,
+) -> Result<(String, String), PassmanError> {
+    let mut file_path = OsString::new();
+    file_path.push(get_output_path());
+    file_path.push(filename);
+
+    let content = read_to_string(file_path)?;
     let parts: Vec<&str> = content.split('|').collect();
 
     // Decode from base64
