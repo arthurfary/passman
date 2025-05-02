@@ -93,7 +93,7 @@ fn get_password(service_name: String) -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) =
-            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
+            file_encryption::read_encrypted_file(&file?.file_name(), &master_pwd)?;
         if file_service_name == service_name {
             println!("{}: {}", service_name, service_password);
             return Ok(());
@@ -160,7 +160,7 @@ fn list_service_names() -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) =
-            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
+            file_encryption::read_encrypted_file(&file?.file_name(), &master_pwd)?;
         service_names.push((file_service_name, service_password));
     }
 
