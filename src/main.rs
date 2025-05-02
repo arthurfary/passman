@@ -3,6 +3,7 @@ mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, rng};
+use rpassword;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::{env, fs};
@@ -15,8 +16,15 @@ use std::{env, fs};
 fn read_input(prompt: &str, is_pass: bool) -> String {
     print!("{}: ", prompt);
     io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
+    let input = if is_pass {
+        let mut temp = String::new();
+        temp.push_str(&rpassword::read_password().unwrap());
+        temp
+    } else {
+        let mut temp = String::new();
+        io::stdin().read_line(&mut temp).unwrap();
+        temp
+    };
     input.trim().to_string()
 }
 
@@ -42,7 +50,7 @@ fn create_random_password(length: usize) -> String {
 }
 
 fn create_new_password(service_name: String) -> Result<(), PassmanError> {
-    let master_pwd = read_input("Master password", false);
+    let master_pwd = read_input("Master password", true);
     let random_pass = create_random_password(16);
 
     let service_name = if service_name.is_empty() {
@@ -73,7 +81,7 @@ fn create_new_password(service_name: String) -> Result<(), PassmanError> {
     Ok(())
 }
 fn get_password(service_name: String) -> Result<(), PassmanError> {
-    let master_pwd = read_input("Enter master password", false);
+    let master_pwd = read_input("Enter master password", true);
 
     let service_name = if service_name.is_empty() {
         read_input("Enter service name", false)
@@ -85,7 +93,7 @@ fn get_password(service_name: String) -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) =
-            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
+            file_encryption::read_encrypted_file(&file?.file_name(), &master_pwd)?;
         if file_service_name == service_name {
             println!("{}: {}", service_name, service_password);
             return Ok(());
@@ -152,7 +160,7 @@ fn list_service_names() -> Result<(), PassmanError> {
 
     for file in password_files {
         let (file_service_name, service_password) =
-            file_encryption::read_encrypted_file(&OsString::from(file?.file_name()), &master_pwd)?;
+            file_encryption::read_encrypted_file(&file?.file_name(), &master_pwd)?;
         service_names.push((file_service_name, service_password));
     }
 
