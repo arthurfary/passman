@@ -20,6 +20,8 @@ pub enum PassmanError {
     ChaChaError(chacha20poly1305::Error),
 
     Utf8Error(std::string::FromUtf8Error),
+
+    PasswordMismatch(String),
 }
 
 /// Implement Display trait for our error type
@@ -33,6 +35,7 @@ impl fmt::Display for PassmanError {
             PassmanError::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
             PassmanError::ChaChaError(e) => write!(f, "ChaChaError: {}", e),
             PassmanError::Utf8Error(e) => write!(f, "Utf8Error? {}", e),
+            PassmanError::PasswordMismatch(msg) => write!(f, "PasswordMismatch: {}", msg),
         }
     }
 }

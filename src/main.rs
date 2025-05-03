@@ -4,6 +4,7 @@ mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, rng};
 use rpassword;
+use std::env::args;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::{env, fs};
@@ -51,6 +52,14 @@ fn create_random_password(length: usize) -> String {
 
 fn create_new_password(service_name: String) -> Result<(), PassmanError> {
     let master_pwd = read_input("Master password", true);
+    let confirm_pwd = read_input("Retype master password", true);
+
+    if master_pwd != confirm_pwd {
+        return Err(PassmanError::PasswordMismatch(
+            "User typed different passwords".to_string(),
+        ));
+    }
+
     let random_pass = create_random_password(16);
 
     let service_name = if service_name.is_empty() {
