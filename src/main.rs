@@ -50,14 +50,16 @@ fn create_random_password(length: usize) -> String {
 }
 
 fn create_new_password(command: Command) -> Result<(), PassmanError> {
-    let master_pwd = read_input("Master password", true);
-    let confirm_pwd = read_input("Retype master password", true);
+    let master_pwd = loop {
+        let pwd = read_input("Master password", true);
+        let confirm_pwd = read_input("Confirm master password", true);
 
-    if master_pwd != confirm_pwd {
-        return Err(PassmanError::PasswordMismatch(
-            "User typed different passwords".to_string(),
-        ));
-    }
+        if pwd == confirm_pwd {
+            break pwd;
+        } else {
+            println!("Passwords do not match, try again.")
+        }
+    };
 
     let random_pass = create_random_password(16);
 
@@ -68,22 +70,22 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
 
     println!("{}", random_pass);
 
-    let gen_random_name = read_input("Generate random name? ([y]/n)", false).to_lowercase();
+    // let gen_random_name = read_input("Generate random name? ([y]/n)", false).to_lowercase();
 
-    let filename = if gen_random_name != "n" {
-        create_random_file_name(8)
-    } else {
-        service_name.clone()
-    };
+    // let filename = if gen_random_name != "n" {
+    //     create_random_file_name(8)
+    // } else {
+    //     service_name.clone()
+    // };
 
     file_encryption::create_encrypted_file(
-        &OsString::from(&filename),
+        &OsString::from(&service_name),
         &master_pwd,
         &service_name,
         random_pass.as_bytes(),
     )?;
 
-    println!("Password file {} created for {}", filename, service_name);
+    println!("Password file created for {}", service_name);
 
     Ok(())
 }
@@ -251,9 +253,9 @@ fn main() {
 
     let command = Command::new(&mut args);
 
-    match run_command(command) {
-        Ok(_) => (),
-        Err(_) => println!("erro"),
+    if let Err(error) = run_command(command) {
+        eprintln!("Error: {}", error);
+        std::process::exit(1); // if error print error then exit with code 1
     }
 }
 

@@ -35,7 +35,10 @@ impl fmt::Display for PassmanError {
             PassmanError::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
             PassmanError::ChaChaError(e) => write!(f, "ChaChaError: {}", e),
             PassmanError::Utf8Error(e) => write!(f, "Utf8Error? {}", e),
-            PassmanError::PasswordMismatch(msg) => write!(f, "PasswordMismatch: {}", msg),
+            PassmanError::PasswordMismatch(_) => write!(
+                f,
+                "Password Mismatch: User typed different master passwords"
+            ),
         }
     }
 }
