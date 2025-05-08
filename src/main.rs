@@ -253,9 +253,25 @@ fn main() {
 
     let command = Command::new(&mut args);
 
-    if let Err(error) = run_command(command) {
-        eprintln!("Error: {}", error);
-        std::process::exit(1); // if error print error then exit with code 1
+    match run_command(command) {
+        Ok(_) => (),
+        Err(err) => match err {
+            PassmanError::IoError(_) => {
+                println!("Error accessing the file (Io Error).")
+            }
+            PassmanError::ChaChaPoly(_) => {
+                println!("Encryption error. Wrong password?")
+            }
+            PassmanError::Base64Decode(_) => {
+                println!("Base64 decoding error: Invalid base64 in password file")
+            }
+            PassmanError::FromUtf8(_) => {
+                println!("Error converting to Utf8. Invalid base64 contents?")
+            }
+            PassmanError::Argon2(_) => {
+                println!("Error hashing the password. Invalid salt or nonce?")
+            }
+        },
     }
 }
 

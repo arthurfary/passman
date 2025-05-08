@@ -22,7 +22,7 @@ pub fn get_output_path() -> OsString {
     let mut path = OsString::from(home);
 
     if cfg!(windows) {
-        path.push(PathBuf::from("\\Documents\\Passwords\\"));
+        path.push(PathBuf::from("Documents\\Passwords\\"));
     } else {
         path.push(PathBuf::from("/.passwords/"));
     }
@@ -58,6 +58,7 @@ pub fn create_encrypted_file(
         "{}|{}|{}|{}",
         salt_b64, nonce_b64, service_name_b64, content_b64
     );
+
     file.write_all(file_content.as_bytes())?;
 
     Ok(())
