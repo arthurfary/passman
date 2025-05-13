@@ -11,6 +11,10 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
+//TODO: Make so the funcitons in this file dont use
+// a filename and a service name,
+// instead, filename should be service name
+
 pub fn get_output_path() -> OsString {
     let home = if cfg!(windows) {
         env::var_os("USERPROFILE")
