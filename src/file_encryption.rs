@@ -50,13 +50,11 @@ pub fn create_encrypted_file(
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
     let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
 
-    // Encode everything with base64 to avoid separator confusion
     let salt_b64 = BASE64_STANDARD.encode(salt);
     let nonce_b64 = BASE64_STANDARD.encode(nonce);
     // let service_name_b64 = BASE64_STANDARD.encode(service_name);
     let content_b64 = BASE64_STANDARD.encode(encrypted_content);
 
-    // Write to file with separator
     let file_content = format!("{}|{}|{}", salt_b64, nonce_b64, content_b64);
 
     file.write_all(file_content.as_bytes())?;
@@ -80,10 +78,8 @@ pub fn read_encrypted_file(filename: &OsString, pwd: &str) -> Result<String, Pas
 
     let nonce = GenericArray::clone_from_slice(&nonce);
 
-    // Recreate the cipher from the password and salt
     let cypher = passman_encryption::gen_decrypt_cipher(pwd.as_bytes(), &salt)?;
 
-    // Decrypt the content
     let decrypted_content = cypher.decrypt(&nonce, encrypted_content.as_ref())?;
 
     Ok(String::from_utf8(decrypted_content)?)

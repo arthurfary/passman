@@ -57,12 +57,12 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
     let master_pwd = read_master_pwd();
     let random_pass = create_random_password(16);
 
+    println!("{}", random_pass);
+
     let service_name = match command.service {
         Some(s) => s,
         None => read_input("Enter service name", false),
     };
-
-    println!("{}", random_pass);
 
     file_encryption::create_encrypted_file(&master_pwd, &service_name, random_pass.as_bytes())?;
 
@@ -70,6 +70,7 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
 
     Ok(())
 }
+
 fn get_password(command: Command) -> Result<(), PassmanError> {
     let master_pwd = read_input("Enter master password", true);
 
@@ -83,6 +84,7 @@ fn get_password(command: Command) -> Result<(), PassmanError> {
     let service_password =
         file_encryption::read_encrypted_file(&OsString::from(&service_name), &master_pwd)?;
 
+    // copy pass to clipboard
     println!("{}: {}", service_name, service_password);
 
     Ok(())
@@ -162,6 +164,23 @@ impl Command {
     }
 }
 
+fn run_command(command: Command) -> Result<(), PassmanError> {
+    match command.name.as_str() {
+        "new" => create_new_password(command)?,
+        "get" => get_password(command)?,
+        "register" => register_password(command)?,
+        "list" => list_files()?,
+        "help" => print_usage(),
+        _ => {
+            println!("Unknown command: {}", command.name.as_str());
+            print_usage();
+            return Ok(());
+        }
+    }
+
+    Ok(())
+}
+
 fn main() {
     let mut args: Vec<String> = env::args().collect(); // skip binary name
 
@@ -193,21 +212,4 @@ fn main() {
             }
         },
     }
-}
-
-fn run_command(command: Command) -> Result<(), PassmanError> {
-    match command.name.as_str() {
-        "new" => create_new_password(command)?,
-        "get" => get_password(command)?,
-        "register" => register_password(command)?,
-        "list" => list_files()?,
-        "help" => print_usage(),
-        _ => {
-            println!("Unknown command: {}", command.name.as_str());
-            print_usage();
-            return Ok(());
-        }
-    }
-
-    Ok(())
 }
