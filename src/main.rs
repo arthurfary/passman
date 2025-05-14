@@ -64,12 +64,7 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
 
     println!("{}", random_pass);
 
-    file_encryption::create_encrypted_file(
-        &OsString::from(&service_name),
-        &master_pwd,
-        &service_name,
-        random_pass.as_bytes(),
-    )?;
+    file_encryption::create_encrypted_file(&master_pwd, &service_name, random_pass.as_bytes())?;
 
     println!("Password file created for {}", service_name);
 
@@ -85,7 +80,7 @@ fn get_password(command: Command) -> Result<(), PassmanError> {
 
     // add fuzzy finding here
 
-    let (_, service_password) =
+    let service_password =
         file_encryption::read_encrypted_file(&OsString::from(&service_name), &master_pwd)?;
 
     println!("{}: {}", service_name, service_password);
@@ -102,16 +97,11 @@ fn register_password(command: Command) -> Result<(), PassmanError> {
     };
 
     let service_pwd = match command.existing_password {
-        Some(s) => s,
+        Some(pwd) => pwd,
         None => read_input("Paste or Type existing password", true),
     };
 
-    file_encryption::create_encrypted_file(
-        &OsString::from(&service_name),
-        &master_pwd,
-        &service_name,
-        service_pwd.as_bytes(),
-    )?;
+    file_encryption::create_encrypted_file(&master_pwd, &service_name, service_pwd.as_bytes())?;
 
     println!(
         "Password file {} created for {}",
