@@ -48,7 +48,11 @@ pub fn create_encrypted_file(
 
     let mut file = File::create(file_path)?;
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
-    let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
+
+    let encrypted_content = cypher.encrypt(
+        &chacha20poly1305::Nonce::from_slice(&nonce),
+        content.as_ref(),
+    )?;
 
     let salt_b64 = BASE64_STANDARD.encode(salt);
     let nonce_b64 = BASE64_STANDARD.encode(nonce);
