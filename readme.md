@@ -22,8 +22,42 @@ One of the core philosophies of passman is tool agnosticism
 
 Download the [latest Passman release](https://github.com/arthurfary/passman/releases) and save it wherever you like.
 
-### To use Passman, simply call the executable with the arguments.
+# To use Passman, simply call the executable with the arguments.
 
+## Create a new password
+- To create a new random password use:
+```
+passman new
+```
+You will be prompted to insert a master password and a service name
+
+- You can also pass arguments directly:
+```
+passman new google
+```
+> Create a password for a Google account, file will be saved as 'google'.
+
+## Get a password
+- To get a password use:
+```
+passman get
+```
+- You can also pass arguments directly:
+```
+passman get google
+```
+## Register a password (Save an already existing password into Passman file)
+> Be sure to ONLY register secure passwords, remember, you are the weakest link
+- To register a password use:
+```
+passman register
+```
+- You can also pass arguments directly:
+```
+passman register github MYVERYSECUREPASSWORD
+```
+
+## You can also list all password files with `passman list`
 
 ## Running:
 For development, run it with cargo using `cargo run ARGS`, you may need to give permissions to the project folder, the simplest way is by doing `chmod +x .` while on the correct directory.

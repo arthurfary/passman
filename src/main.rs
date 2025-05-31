@@ -196,6 +196,7 @@ fn decrypt_file_prompt(filename: String) -> Result<(), PassmanError> {
 fn print_usage() {
     println!("Passman password manager");
     println!("Usage:");
+<<<<<<< Updated upstream
     println!("  new       - Create new password for a service");
     println!("  decrypt   - Decrypt a file manually");
     println!("  get       - Get a password for a service");
@@ -203,6 +204,13 @@ fn print_usage() {
     println!("  list      - List all passwords files in password folder");
     println!("  dall      - Decrypt all");
     println!("  help      - Show this help message\n");
+=======
+    println!("  new [service]                 - Create new password for a service");
+    println!("  get [service]                 - Get a password for a service");
+    println!("  register [service] [password] - Register existing password for a service");
+    println!("  list                          - List all passwords files in password folder");
+    println!("  help                          - Show this help message\n");
+>>>>>>> Stashed changes
     println!("Examples:");
     println!("  passman new");
     println!("  passman register");
