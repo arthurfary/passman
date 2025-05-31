@@ -9,7 +9,6 @@ use std::io::{self, Write};
 use std::{env, fs};
 
 //TODO:
-// - Find a better way of handeling the master password (Should be a parameter probably)
 // - Find a better way of handeling user input (same bit of code repeation)
 
 fn read_input(prompt: &str, is_pass: bool) -> String {
