@@ -16,17 +16,15 @@ use crate::passman_encryption;
 // instead, filename should be service name
 
 pub fn get_output_path() -> OsString {
-    let home = if cfg!(windows) {
+    let mut path = if cfg!(windows) {
         env::var_os("USERPROFILE")
     } else {
         env::var_os("HOME")
     }
     .unwrap_or_default();
 
-    let mut path = OsString::from(home);
-
     if cfg!(windows) {
-        path.push(PathBuf::from("Documents\\Passwords\\"));
+        path.push(PathBuf::from("\\Documents\\Passwords\\"));
     } else {
         path.push(PathBuf::from("/.passwords/"));
     }
