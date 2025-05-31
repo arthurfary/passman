@@ -126,19 +126,11 @@ fn list_files() -> Result<(), PassmanError> {
 fn print_usage() {
     println!("Passman password manager");
     println!("Usage:");
-<<<<<<< Updated upstream
-    println!("  new       - Create new password for a service");
-    println!("  get       - Get a password for a service");
-    println!("  register  - Register existing password for a service");
-    println!("  list      - List all passwords files in password folder");
-    println!("  help      - Show this help message\n");
-=======
     println!("  new [service]                 - Create new password for a service");
     println!("  get [service]                 - Get a password for a service");
     println!("  register [service] [password] - Register existing password for a service");
     println!("  list                          - List all passwords files in password folder");
     println!("  help                          - Show this help message\n");
->>>>>>> Stashed changes
     println!("Examples:");
     println!("  passman new github");
     println!("  passman register");
