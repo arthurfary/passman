@@ -37,7 +37,10 @@ passman new google
 ```
 > Create a password for a Google account, file will be saved as 'google'.
 
-## Get a password
+**Passman saves passwords locally**
+- Windows: `C:\Users\USER\Documents\Passwords\`
+- Linux: `~/.passwords/`
+# Get a password
 - To get a password use:
 ```
 passman get
