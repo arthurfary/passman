@@ -22,7 +22,7 @@ One of the core philosophies of passman is tool agnosticism
 
 Download the [latest Passman release](https://github.com/arthurfary/passman/releases) and save it wherever you like.
 
-# To use Passman, simply call the executable with the arguments.
+# To use Passman, simply call the executable from a command line.
 
 ## Create a new password
 - To create a new random password use:
