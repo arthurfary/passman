@@ -11,15 +11,17 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
+//TODO: Make so the funcitons in this file dont use
+// a filename and a service name,
+// instead, filename should be service name
+
 pub fn get_output_path() -> OsString {
-    let home = if cfg!(windows) {
+    let mut path = if cfg!(windows) {
         env::var_os("USERPROFILE")
     } else {
         env::var_os("HOME")
     }
     .unwrap_or_default();
-
-    let mut path = OsString::from(home);
 
     if cfg!(windows) {
         path.push(PathBuf::from("\\Documents\\Passwords\\"));
@@ -31,7 +33,6 @@ pub fn get_output_path() -> OsString {
 }
 
 pub fn create_encrypted_file(
-    filename: &OsString,
     pwd: &str,
     service_name: &str,
     content: &[u8],
@@ -41,32 +42,29 @@ pub fn create_encrypted_file(
 
     let mut file_path = OsString::new();
     file_path.push(get_output_path());
-    file_path.push(filename);
+    file_path.push(OsString::from(service_name));
 
     let mut file = File::create(file_path)?;
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
-    let encrypted_content = cypher.encrypt(&nonce, content.as_ref())?;
 
-    // Encode everything with base64 to avoid separator confusion
+    let encrypted_content = cypher.encrypt(
+        &chacha20poly1305::Nonce::from_slice(&nonce),
+        content.as_ref(),
+    )?;
+
     let salt_b64 = BASE64_STANDARD.encode(salt);
     let nonce_b64 = BASE64_STANDARD.encode(nonce);
-    let service_name_b64 = BASE64_STANDARD.encode(service_name);
+    // let service_name_b64 = BASE64_STANDARD.encode(service_name);
     let content_b64 = BASE64_STANDARD.encode(encrypted_content);
 
-    // Write to file with separator
-    let file_content = format!(
-        "{}|{}|{}|{}",
-        salt_b64, nonce_b64, service_name_b64, content_b64
-    );
+    let file_content = format!("{}|{}|{}", salt_b64, nonce_b64, content_b64);
+
     file.write_all(file_content.as_bytes())?;
 
     Ok(())
 }
 
-pub fn read_encrypted_file(
-    filename: &OsString,
-    pwd: &str,
-) -> Result<(String, String), PassmanError> {
+pub fn read_encrypted_file(filename: &OsString, pwd: &str) -> Result<String, PassmanError> {
     let mut file_path = OsString::new();
     file_path.push(get_output_path());
     file_path.push(filename);
@@ -77,19 +75,14 @@ pub fn read_encrypted_file(
     // Decode from base64
     let salt = BASE64_STANDARD.decode(parts[0])?;
     let nonce = BASE64_STANDARD.decode(parts[1])?;
-    let service_name = BASE64_STANDARD.decode(parts[2])?;
-    let encrypted_content = BASE64_STANDARD.decode(parts[3])?;
+    // let service_name = BASE64_STANDARD.decode(parts[2])?;
+    let encrypted_content = BASE64_STANDARD.decode(parts[2])?;
 
     let nonce = GenericArray::clone_from_slice(&nonce);
 
-    // Recreate the cipher from the password and salt
     let cypher = passman_encryption::gen_decrypt_cipher(pwd.as_bytes(), &salt)?;
 
-    // Decrypt the content
     let decrypted_content = cypher.decrypt(&nonce, encrypted_content.as_ref())?;
 
-    Ok((
-        String::from_utf8(service_name)?,
-        String::from_utf8(decrypted_content)?,
-    ))
+    Ok(String::from_utf8(decrypted_content)?)
 }

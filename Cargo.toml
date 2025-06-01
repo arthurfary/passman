@@ -1,7 +1,7 @@
 [package]
 name = "passman"
-version = "0.1.0"
-edition = "2024"
+version = "0.2.0"
+edition = "2025"
 
 [dependencies]
 argon2 = "0.5.3"
