@@ -1,6 +1,7 @@
 mod error;
 mod file_encryption;
 mod passman_encryption;
+use cli_clipboard;
 use error::PassmanError;
 use rand::{Rng, rng};
 use rpassword;
@@ -85,6 +86,7 @@ fn get_password(command: Command) -> Result<(), PassmanError> {
 
     // copy pass to clipboard
     println!("{}: {}", service_name, service_password);
+    cli_clipboard::set_contents(service_password.to_owned()).unwrap();
 
     Ok(())
 }
