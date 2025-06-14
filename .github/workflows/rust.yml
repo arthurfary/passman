@@ -21,4 +21,9 @@ jobs:
         run: cargo build --profile ${{ matrix.BUILD_TARGET }}
       - name: Run tests in "${{ matrix.BUILD_TARGET }}" mode
         run: cargo test --profile ${{ matrix.BUILD_TARGET }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/my-binary
 
