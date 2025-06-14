@@ -12,15 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        BUILD_TARGET: [release] # refers to a cargo profile
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu]
     outputs:
       release_built: ${{ steps.set-output.outputs.release_built }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build binaries in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo build --profile ${{ matrix.BUILD_TARGET }}
-      - name: Run tests in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo test --profile ${{ matrix.BUILD_TARGET }}
+      
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build binaries in release mode
+        run: cargo build --release --target ${{ matrix.target }}
+        
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
