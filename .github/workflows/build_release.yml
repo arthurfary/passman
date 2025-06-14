@@ -1,25 +1,50 @@
-name: Build Release
-
 on:
+  release:
+    types: [created]
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
 
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  release:
+    name: release ${{ matrix.target }} (with non-required env)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            archive: zip
+          - target: x86_64-unknown-linux-musl
+            archive: tar.gz
+          - target: wasm32-wasi
+            archive: zip tar.gz
+    steps:
+      - uses: actions/checkout@master
+      - name: Compile and release
+        uses: rust-build/rust-build.action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          RUSTTARGET: ${{ matrix.target }}
+          EXTRA_FILES: "README.md"
+          ARCHIVE_TYPES: ${{ matrix.archive }}
+          PRE_BUILD: "pre_build.sh"
+          POST_BUILD: "test/post_build.sh"
+          MINIFY: "yes"
+  release_without_not_required:
+    name: release ${{ matrix.target }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: true
       matrix:
-        BUILD_TARGET: [release] # refers to a cargo profile
-    outputs:
-      release_built: ${{ steps.set-output.outputs.release_built }}
+        target: [x86_64-unknown-linux-musl]
     steps:
-      - uses: actions/checkout@v4
-      - name: Build binaries in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo build --profile ${{ matrix.BUILD_TARGET }}
-      - name: Run tests in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo test --profile ${{ matrix.BUILD_TARGET }}
+      - uses: actions/checkout@master
+      - name: Compile and release
+        uses: rust-build/rust-build.action@master
+        with:
+          RUSTTARGET: ${{ matrix.target }}
+          UPLOAD_MODE: none
+      - name: Checkout output
+        run: ls -laR
