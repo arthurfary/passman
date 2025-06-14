@@ -3,7 +3,6 @@ mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
 use rand::{Rng, rng};
-use rpassword;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::{env, fs};
@@ -56,8 +55,6 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
     let master_pwd = read_master_pwd();
     let random_pass = create_random_password(16);
 
-    println!("{}", random_pass);
-
     let service_name = match command.service {
         Some(s) => s,
         None => read_input("Enter service name", false),
@@ -84,7 +81,8 @@ fn get_password(command: Command) -> Result<(), PassmanError> {
         file_encryption::read_encrypted_file(&OsString::from(&service_name), &master_pwd)?;
 
     // copy pass to clipboard
-    println!("{}: {}", service_name, service_password);
+    // println!("{}: {}", service_name, service_password);
+    cli_clipboard::set_contents(service_password.to_owned()).unwrap();
 
     Ok(())
 }
@@ -181,7 +179,7 @@ fn run_command(command: Command) -> Result<(), PassmanError> {
 }
 
 fn main() {
-    let mut args: Vec<String> = env::args().collect(); // skip binary name
+    let args: Vec<String> = env::args().collect(); // skip binary name
 
     if args.len() == 1 {
         // if no args
@@ -189,7 +187,7 @@ fn main() {
         return;
     }
 
-    let command = Command::new(&mut args);
+    let command = Command::new(&args);
 
     match run_command(command) {
         Ok(_) => (),
