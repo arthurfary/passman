@@ -2,8 +2,8 @@ mod error;
 mod file_encryption;
 mod passman_encryption;
 use error::PassmanError;
+use file_encryption::get_password_file_path;
 use rand::{Rng, rng};
-use std::ffi::OsString;
 use std::io::{self, Write};
 use std::{env, fs};
 
@@ -68,20 +68,18 @@ fn create_new_password(command: Command) -> Result<(), PassmanError> {
 }
 
 fn get_password(command: Command) -> Result<(), PassmanError> {
-    let master_pwd = read_input("Enter master password", true);
-
     let service_name = match command.service {
         Some(s) => s,
         None => read_input("Enter service name", false),
     };
+    let file_path = get_password_file_path(&service_name);
 
     // add fuzzy finding here
 
-    let service_password =
-        file_encryption::read_encrypted_file(&OsString::from(&service_name), &master_pwd)?;
+    let master_pwd = read_input("Enter master password", true);
 
-    // copy pass to clipboard
-    // println!("{}: {}", service_name, service_password);
+    let service_password = file_encryption::read_encrypted_file(file_path, &master_pwd)?;
+
     cli_clipboard::set_contents(service_password.to_owned()).unwrap();
 
     Ok(())

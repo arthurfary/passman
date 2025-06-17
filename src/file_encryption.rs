@@ -32,6 +32,14 @@ pub fn get_output_path() -> OsString {
     path
 }
 
+pub fn get_password_file_path(filename: &str) -> OsString {
+    let mut file_path = OsString::new();
+    file_path.push(get_output_path());
+    file_path.push(OsString::from(filename));
+
+    file_path
+}
+
 pub fn create_encrypted_file(
     pwd: &str,
     service_name: &str,
@@ -40,9 +48,7 @@ pub fn create_encrypted_file(
     // creates path if it doesnt exist
     create_dir_all(get_output_path()).unwrap();
 
-    let mut file_path = OsString::new();
-    file_path.push(get_output_path());
-    file_path.push(OsString::from(service_name));
+    let file_path = get_password_file_path(service_name);
 
     let mut file = File::create(file_path)?;
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
@@ -64,18 +70,13 @@ pub fn create_encrypted_file(
     Ok(())
 }
 
-pub fn read_encrypted_file(filename: &OsString, pwd: &str) -> Result<String, PassmanError> {
-    let mut file_path = OsString::new();
-    file_path.push(get_output_path());
-    file_path.push(filename);
-
+pub fn read_encrypted_file(file_path: OsString, pwd: &str) -> Result<String, PassmanError> {
     let content = read_to_string(file_path)?;
     let parts: Vec<&str> = content.split('|').collect();
 
     // Decode from base64
     let salt = BASE64_STANDARD.decode(parts[0])?;
     let nonce = BASE64_STANDARD.decode(parts[1])?;
-    // let service_name = BASE64_STANDARD.decode(parts[2])?;
     let encrypted_content = BASE64_STANDARD.decode(parts[2])?;
 
     let nonce = GenericArray::clone_from_slice(&nonce);
