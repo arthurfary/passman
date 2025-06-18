@@ -4,7 +4,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chacha20poly1305::aead::Aead;
 
@@ -15,29 +15,22 @@ use crate::passman_encryption;
 // a filename and a service name,
 // instead, filename should be service name
 
-pub fn get_output_path() -> OsString {
-    let mut path = if cfg!(windows) {
-        env::var_os("USERPROFILE")
-    } else {
-        env::var_os("HOME")
-    }
-    .unwrap_or_default();
-
-    if cfg!(windows) {
-        path.push(PathBuf::from("\\Documents\\Passwords\\"));
-    } else {
-        path.push(PathBuf::from("/.passwords/"));
-    }
-
+#[cfg(target_family = "unix")]
+pub fn get_output_path() -> PathBuf {
+    let mut path = PathBuf::from(env::var_os("HOME").unwrap_or_default());
+    path.push(PathBuf::from("/.passwords/"));
     path
 }
 
-pub fn get_password_file_path(filename: &str) -> OsString {
-    let mut file_path = OsString::new();
-    file_path.push(get_output_path());
-    file_path.push(OsString::from(filename));
+#[cfg(target_family = "windows")]
+pub fn get_output_path() -> PathBuf {
+    let mut path = PathBuf::from(env::var_os("USERPROFILE").unwrap_or_default());
+    path.push(PathBuf::from("\\Documents\\Passwords\\"));
+    path
+}
 
-    file_path
+pub fn get_password_file_path(filename: &str) -> PathBuf {
+    get_output_path().join(filename)
 }
 
 pub fn create_encrypted_file(
