@@ -1,10 +1,9 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
 use std::env;
-use std::ffi::OsString;
 use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chacha20poly1305::aead::Aead;
 
@@ -18,7 +17,7 @@ use crate::passman_encryption;
 #[cfg(target_family = "unix")]
 pub fn get_output_path() -> PathBuf {
     let mut path = PathBuf::from(env::var_os("HOME").unwrap_or_default());
-    path.push(PathBuf::from("/.passwords/"));
+    path.push(PathBuf::from(".passwords/"));
     path
 }
 
@@ -47,7 +46,7 @@ pub fn create_encrypted_file(
     let (cypher, salt, nonce) = passman_encryption::gen_new_cipher(pwd.as_bytes())?;
 
     let encrypted_content = cypher.encrypt(
-        &chacha20poly1305::Nonce::from_slice(&nonce),
+        chacha20poly1305::Nonce::from_slice(&nonce),
         content.as_ref(),
     )?;
 
@@ -63,7 +62,7 @@ pub fn create_encrypted_file(
     Ok(())
 }
 
-pub fn read_encrypted_file(file_path: OsString, pwd: &str) -> Result<String, PassmanError> {
+pub fn read_encrypted_file(file_path: PathBuf, pwd: &str) -> Result<String, PassmanError> {
     let content = read_to_string(file_path)?;
     let parts: Vec<&str> = content.split('|').collect();
 

@@ -1,11 +1,13 @@
 mod error;
 mod file_encryption;
 mod passman_encryption;
+use arboard::Clipboard;
 use error::PassmanError;
 use file_encryption::get_password_file_path;
 use rand::{Rng, rng};
+use std::env;
+use std::fs;
 use std::io::{self, Write};
-use std::{env, fs};
 
 //TODO:
 // - Find a better way of handeling user input (same bit of code repeation)
@@ -80,7 +82,11 @@ fn get_password(command: Command) -> Result<(), PassmanError> {
 
     let service_password = file_encryption::read_encrypted_file(file_path, &master_pwd)?;
 
-    cli_clipboard::set_contents(service_password.to_owned()).unwrap();
+    println!("{}", &service_password);
+
+    let mut clip = Clipboard::new().unwrap();
+
+    clip.set_text(service_password).unwrap();
 
     Ok(())
 }

@@ -4,9 +4,9 @@ version = "0.2.0"
 edition = "2024"
 
 [dependencies]
+arboard = "3.5.0"
 argon2 = "0.5.3"
 base64 = "0.22.1"
 chacha20poly1305 = "0.10.1"
-cli-clipboard = "0.4.0"
 rand = "0.9.1"
 rpassword = "7.4.0"
