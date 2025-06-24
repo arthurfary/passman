@@ -10,21 +10,26 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
-//TODO: Make so the funcitons in this file dont use
-// a filename and a service name,
-// instead, filename should be service name
-
-#[cfg(target_family = "unix")]
 pub fn get_output_path() -> PathBuf {
-    let mut path = PathBuf::from(env::var_os("HOME").unwrap_or_default());
-    path.push(PathBuf::from(".passwords/"));
-    path
-}
+    let mut path = match env::var_os("HOME").or_else(|| env::var_os("USERPROFILE")) {
+        Some(home) => PathBuf::from(home),
+        None => {
+            // Fallback to current working directory
+            env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        }
+    };
 
-#[cfg(target_family = "windows")]
-pub fn get_output_path() -> PathBuf {
-    let mut path = PathBuf::from(env::var_os("USERPROFILE").unwrap_or_default());
-    path.push(PathBuf::from("\\Documents\\Passwords\\"));
+    #[cfg(target_family = "unix")]
+    {
+        path.push(".passwords");
+    }
+
+    #[cfg(target_family = "windows")]
+    {
+        path.push("Documents");
+        path.push("Passwords");
+    }
+
     path
 }
 
