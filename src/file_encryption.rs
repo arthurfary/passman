@@ -1,5 +1,6 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
+use dirs::home_dir;
 use std::env;
 use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
@@ -10,31 +11,15 @@ use chacha20poly1305::aead::Aead;
 use crate::error::PassmanError;
 use crate::passman_encryption;
 
-pub fn get_output_path() -> PathBuf {
-    let mut path = match env::var_os("HOME").or_else(|| env::var_os("USERPROFILE")) {
-        Some(home) => PathBuf::from(home),
-        None => {
-            // Fallback to current working directory
-            env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-        }
-    };
-
-    #[cfg(target_family = "unix")]
-    {
-        path.push(".passwords");
+pub fn get_path() -> PathBuf {
+    match home_dir() {
+        Some(path) => path,
+        None => PathBuf::from("."),
     }
-
-    #[cfg(target_family = "windows")]
-    {
-        path.push("Documents");
-        path.push("Passwords");
-    }
-
-    path
 }
 
 pub fn get_password_file_path(filename: &str) -> PathBuf {
-    get_output_path().join(filename)
+    home_dir().join(filename)
 }
 
 pub fn create_encrypted_file(
@@ -83,4 +68,18 @@ pub fn read_encrypted_file(file_path: PathBuf, pwd: &str) -> Result<String, Pass
     let decrypted_content = cypher.decrypt(&nonce, encrypted_content.as_ref())?;
 
     Ok(String::from_utf8(decrypted_content)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fmt::format, path::PathBuf};
+
+    use dirs::home_dir;
+
+    use super::get_password_file_path;
+
+    #[test]
+    fn test_create_encrypted_file() {
+        assert_eq!()
+    }
 }
