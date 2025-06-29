@@ -115,7 +115,7 @@ fn register_password(command: Command) -> Result<(), PassmanError> {
 }
 
 fn list_files() -> Result<(), PassmanError> {
-    let password_files = fs::read_dir(file_encryption::get_output_path()).unwrap();
+    let password_files = fs::read_dir(file_encryption::get_path()).unwrap();
 
     for file in password_files {
         println!("{}", file.unwrap().path().display())

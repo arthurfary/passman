@@ -1,7 +1,6 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
 use dirs::home_dir;
-use std::env;
 use std::fs::{File, create_dir_all, read_to_string};
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -19,7 +18,7 @@ pub fn get_path() -> PathBuf {
 }
 
 pub fn get_password_file_path(filename: &str) -> PathBuf {
-    home_dir().join(filename)
+    get_path().join(filename)
 }
 
 pub fn create_encrypted_file(
@@ -28,8 +27,7 @@ pub fn create_encrypted_file(
     content: &[u8],
 ) -> Result<(), PassmanError> {
     // creates path if it doesnt exist
-    create_dir_all(get_output_path()).unwrap();
-
+    create_dir_all(get_path()).unwrap();
     let file_path = get_password_file_path(service_name);
 
     let mut file = File::create(file_path)?;
@@ -72,14 +70,30 @@ pub fn read_encrypted_file(file_path: PathBuf, pwd: &str) -> Result<String, Pass
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::format, path::PathBuf};
+    const MASTER_PASS: &str = "test_master_pass";
+    const SERVICE_NAME: &str = "test_service";
+    const TEST_PASS: &[u8] = "test_pass".as_bytes();
 
-    use dirs::home_dir;
-
-    use super::get_password_file_path;
+    use crate::file_encryption::{
+        create_encrypted_file, get_password_file_path, read_encrypted_file,
+    };
+    use std::fs;
 
     #[test]
     fn test_create_encrypted_file() {
-        assert_eq!()
+        assert!(create_encrypted_file(MASTER_PASS, SERVICE_NAME, TEST_PASS).is_ok());
+
+        assert!(fs::exists(get_password_file_path(SERVICE_NAME)).expect("Arquivo nao encontrado"));
+
+        fs::remove_file(get_password_file_path(SERVICE_NAME)).unwrap();
+    }
+
+    #[test]
+    fn test_read_encrypted_file() {
+        assert!(create_encrypted_file(MASTER_PASS, SERVICE_NAME, TEST_PASS).is_ok());
+
+        assert!(fs::exists(get_password_file_path(SERVICE_NAME)).expect("Arquivo nao encontrado"));
+
+        fs::remove_file(get_password_file_path(SERVICE_NAME)).unwrap();
     }
 }
