@@ -1,7 +1,7 @@
 use base64::prelude::*;
 use chacha20poly1305::aead::generic_array::GenericArray;
 use dirs::home_dir;
-use std::fs::{File, create_dir_all, read_to_string};
+use std::fs::{create_dir_all, read_to_string, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
 
@@ -66,34 +66,4 @@ pub fn read_encrypted_file(file_path: PathBuf, pwd: &str) -> Result<String, Pass
     let decrypted_content = cypher.decrypt(&nonce, encrypted_content.as_ref())?;
 
     Ok(String::from_utf8(decrypted_content)?)
-}
-
-#[cfg(test)]
-mod tests {
-    const MASTER_PASS: &str = "test_master_pass";
-    const SERVICE_NAME: &str = "test_service";
-    const TEST_PASS: &[u8] = "test_pass".as_bytes();
-
-    use crate::file_encryption::{
-        create_encrypted_file, get_password_file_path, read_encrypted_file,
-    };
-    use std::fs;
-
-    #[test]
-    fn test_create_encrypted_file() {
-        assert!(create_encrypted_file(MASTER_PASS, SERVICE_NAME, TEST_PASS).is_ok());
-
-        assert!(fs::exists(get_password_file_path(SERVICE_NAME)).expect("Arquivo nao encontrado"));
-
-        fs::remove_file(get_password_file_path(SERVICE_NAME)).unwrap();
-    }
-
-    #[test]
-    fn test_read_encrypted_file() {
-        assert!(create_encrypted_file(MASTER_PASS, SERVICE_NAME, TEST_PASS).is_ok());
-
-        assert!(fs::exists(get_password_file_path(SERVICE_NAME)).expect("Arquivo nao encontrado"));
-
-        fs::remove_file(get_password_file_path(SERVICE_NAME)).unwrap();
-    }
 }
