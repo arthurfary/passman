@@ -1,216 +1,421 @@
 mod error;
 mod file_encryption;
 mod passman_encryption;
+
 use arboard::Clipboard;
 use error::PassmanError;
-use file_encryption::get_password_file_path;
-use rand::{Rng, rng};
+use file_encryption::PassmanStorage;
+use rand::Rng;
 use std::env;
-use std::fs;
 use std::io::{self, Write};
 
-//TODO:
-// - Find a better way of handeling user input (same bit of code repeation)
-
-fn read_input(prompt: &str, is_pass: bool) -> String {
-    print!("{}: ", prompt);
-    io::stdout().flush().unwrap();
-    let input = if is_pass {
-        let mut temp = String::new();
-        temp.push_str(&rpassword::read_password().unwrap());
-        temp
-    } else {
-        let mut temp = String::new();
-        io::stdin().read_line(&mut temp).unwrap();
-        temp
-    };
-    input.trim().to_string()
+/// Session wrapper for CLI operations
+pub struct PassmanSession {
+    storage: PassmanStorage,
 }
 
-fn read_master_pwd() -> String {
-    loop {
-        let pwd = read_input("Master password", true);
-        let confirm_pwd = read_input("Confirm master password", true);
+impl PassmanSession {
+    /// Initialize a new session by prompting for master password once
+    pub fn new() -> Result<Self, PassmanError> {
+        let master_pwd = read_master_password()?;
+        let storage = PassmanStorage::new(master_pwd);
+        Ok(Self { storage })
+    }
 
-        if pwd == confirm_pwd {
-            break pwd;
+    /// Create a new random password for a service
+    pub fn create_password(&self, service: Option<String>) -> Result<(), PassmanError> {
+        let service_name = get_service_name(service)?;
+
+        // Check if service already exists
+        if self.storage.has_service(&service_name) {
+            println!(
+                "Service '{}' already exists. Use 'update' to change it.",
+                service_name
+            );
+            return Ok(());
+        }
+
+        let random_password = generate_random_password(16);
+        self.storage.store(&service_name, &random_password)?;
+
+        println!("✓ New password created for '{}'", service_name);
+        println!("Password copied to clipboard!");
+
+        copy_to_clipboard(&random_password)?;
+        Ok(())
+    }
+
+    /// Retrieve and copy password to clipboard
+    pub fn get_password(&self, service: Option<String>) -> Result<(), PassmanError> {
+        let service_name = match service {
+            Some(name) => {
+                // Check if service exists exactly
+                if self.storage.has_service(&name) {
+                    name
+                } else {
+                    println!("Service '{}' not found.", name);
+                    return Ok(());
+                }
+            }
+            None => {
+                // Show all services and let user choose
+                let services = self.storage.list_services()?;
+                if services.is_empty() {
+                    println!("No passwords stored yet. Use 'new' to create one.");
+                    return Ok(());
+                }
+                self.select_from_list(services)?
+            }
+        };
+
+        let password = self.storage.retrieve(&service_name)?;
+        copy_to_clipboard(&password)?;
+
+        println!("✓ Password for '{}' copied to clipboard!", service_name);
+        Ok(())
+    }
+
+    /// Register an existing password for a service
+    pub fn register_password(
+        &self,
+        service: Option<String>,
+        password: Option<String>,
+    ) -> Result<(), PassmanError> {
+        let service_name = get_service_name(service)?;
+
+        if self.storage.has_service(&service_name) {
+            println!(
+                "Service '{}' already exists. Use 'update' to change it.",
+                service_name
+            );
+            return Ok(());
+        }
+
+        let service_password = match password {
+            Some(pwd) => pwd,
+            None => read_input("Enter existing password", true)?,
+        };
+
+        self.storage.store(&service_name, &service_password)?;
+        println!("✓ Password registered for '{}'", service_name);
+
+        Ok(())
+    }
+
+    /// Update an existing password
+    pub fn update_password(
+        &self,
+        service: Option<String>,
+        password: Option<String>,
+    ) -> Result<(), PassmanError> {
+        let service_name = get_service_name(service)?;
+
+        if !self.storage.has_service(&service_name) {
+            println!(
+                "Service '{}' not found. Use 'new' or 'register' to create it.",
+                service_name
+            );
+            return Ok(());
+        }
+
+        let new_password = match password {
+            Some(pwd) => pwd,
+            None => {
+                println!("Choose an option:");
+                println!("1. Generate random password");
+                println!("2. Enter custom password");
+                let choice = read_input("Enter choice (1 or 2)", false)?;
+
+                match choice.trim() {
+                    "1" => generate_random_password(16),
+                    "2" => read_input("Enter new password", true)?,
+                    _ => {
+                        println!("Invalid choice. Using random password.");
+                        generate_random_password(16)
+                    }
+                }
+            }
+        };
+
+        self.storage.store(&service_name, &new_password)?;
+        println!("✓ Password updated for '{}'", service_name);
+
+        Ok(())
+    }
+
+    /// Delete a service
+    pub fn delete_service(&self, service: Option<String>) -> Result<(), PassmanError> {
+        let service_name = get_service_name(service)?;
+
+        if !self.storage.has_service(&service_name) {
+            println!("Service '{}' not found.", service_name);
+            return Ok(());
+        }
+
+        // Confirm deletion
+        let confirm = read_input(
+            &format!("Delete password for '{}'? (y/N)", service_name),
+            false,
+        )?;
+        if confirm.to_lowercase() != "y" && confirm.to_lowercase() != "yes" {
+            println!("Deletion cancelled.");
+            return Ok(());
+        }
+
+        self.storage.delete_service(&service_name)?;
+        println!("✓ Password for '{}' deleted", service_name);
+
+        Ok(())
+    }
+
+    /// List all stored services
+    pub fn list_services(&self) -> Result<(), PassmanError> {
+        let services = self.storage.list_services()?;
+
+        if services.is_empty() {
+            println!("No passwords stored yet. Use 'new' to create one.");
+            return Ok(());
+        }
+
+        println!("Stored services ({}):", services.len());
+        for (i, service) in services.iter().enumerate() {
+            println!("  {}. {}", i + 1, service);
+        }
+
+        Ok(())
+    }
+
+    // Helper method for interactive selection
+    fn select_from_list(&self, services: Vec<String>) -> Result<String, PassmanError> {
+        println!("Available services:");
+        for (i, service) in services.iter().enumerate() {
+            println!("  {}. {}", i + 1, service);
+        }
+
+        let choice = read_input("Enter number", false)?;
+        let index: usize = choice
+            .trim()
+            .parse()
+            // TODO: Add InvalidInput variant to PassmanError enum
+            .map_err(|_| {
+                PassmanError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Invalid input",
+                ))
+            })?;
+
+        if index == 0 || index > services.len() {
+            // TODO: Add InvalidInput variant to PassmanError enum
+            return Err(PassmanError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid input",
+            )));
+        }
+
+        Ok(services[index - 1].clone())
+    }
+}
+
+/// Command structure for parsing CLI arguments
+#[derive(Debug)]
+struct Command {
+    name: String,
+    service: Option<String>,
+    extra_arg: Option<String>,
+}
+
+impl Command {
+    fn parse(args: &[String]) -> Result<Self, PassmanError> {
+        if args.len() < 2 {
+            // TODO: Add InvalidInput variant to PassmanError enum
+            return Err(PassmanError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid input",
+            )));
+        }
+
+        let name = args[1].clone();
+        let service = args.get(2).cloned();
+        let extra_arg = args.get(3).cloned();
+
+        Ok(Command {
+            name,
+            service,
+            extra_arg,
+        })
+    }
+}
+
+// Utility functions
+
+fn read_input(prompt: &str, is_password: bool) -> Result<String, PassmanError> {
+    print!("{}: ", prompt);
+    io::stdout().flush()?;
+
+    let input = if is_password {
+        rpassword::read_password()?
+    } else {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        input
+    };
+
+    Ok(input.trim().to_string())
+}
+
+fn read_master_password() -> Result<String, PassmanError> {
+    loop {
+        let password = read_input("Master password", true)?;
+        let confirm = read_input("Confirm master password", true)?;
+
+        if password == confirm {
+            if password.is_empty() {
+                println!("Master password cannot be empty!");
+                continue;
+            }
+            return Ok(password);
         } else {
-            println!("Passwords do not match, try again.")
+            println!("Passwords do not match, try again.");
         }
     }
 }
 
-fn create_random_password(length: usize) -> String {
-    const CHARSET: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~`!@#$%^&*()_-+={[}]|\\:;\"'<,>.?/";
+fn get_service_name(service: Option<String>) -> Result<String, PassmanError> {
+    match service {
+        Some(name) => {
+            if name.is_empty() {
+                // TODO: Add InvalidInput variant to PassmanError enum
+                Err(PassmanError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Invalid input",
+                )))
+            } else {
+                Ok(name)
+            }
+        }
+        None => read_input("Enter service name", false),
+    }
+}
 
-    let mut rng = rng();
+fn generate_random_password(length: usize) -> String {
+    const CHARSET: &[u8] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+    let mut rng = rand::thread_rng();
     (0..length)
         .map(|_| {
-            let idx = rng.random_range(0..CHARSET.len());
-            char::from(CHARSET[idx])
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
         })
         .collect()
 }
 
-fn create_new_password(command: Command) -> Result<(), PassmanError> {
-    let master_pwd = read_master_pwd();
-    let random_pass = create_random_password(16);
-
-    let service_name = match command.service {
-        Some(s) => s,
-        None => read_input("Enter service name", false),
-    };
-
-    file_encryption::create_encrypted_file(&master_pwd, &service_name, random_pass.as_bytes())?;
-
-    println!("Password file created for {}", service_name);
-
-    Ok(())
-}
-
-fn get_password(command: Command) -> Result<(), PassmanError> {
-    let service_name = match command.service {
-        Some(s) => s,
-        None => read_input("Enter service name", false),
-    };
-    let file_path = get_password_file_path(&service_name);
-
-    // add fuzzy finding here
-
-    let master_pwd = read_input("Enter master password", true);
-
-    let service_password = file_encryption::read_encrypted_file(file_path, &master_pwd)?;
-
-    println!("{}", &service_password);
-
-    let mut clip = Clipboard::new().unwrap();
-
-    clip.set_text(service_password).unwrap();
-
-    Ok(())
-}
-
-fn register_password(command: Command) -> Result<(), PassmanError> {
-    let master_pwd = read_input("Master password", true);
-
-    let service_name = match command.service {
-        Some(s) => s,
-        None => read_input("Enter service name", false),
-    };
-
-    let service_pwd = match command.existing_password {
-        Some(pwd) => pwd,
-        None => read_input("Paste or Type existing password", true),
-    };
-
-    file_encryption::create_encrypted_file(&master_pwd, &service_name, service_pwd.as_bytes())?;
-
-    println!(
-        "Password file {} created for {}",
-        service_name, service_name
-    );
-
-    Ok(())
-}
-
-fn list_files() -> Result<(), PassmanError> {
-    let password_files = fs::read_dir(file_encryption::get_path()).unwrap();
-
-    for file in password_files {
-        println!("{}", file.unwrap().path().display())
-    }
-
+fn copy_to_clipboard(text: &str) -> Result<(), PassmanError> {
+    // TODO: Add ClipboardError variant to PassmanError enum
+    let mut clipboard = Clipboard::new().map_err(|_| {
+        PassmanError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Clipboard error",
+        ))
+    })?;
+    clipboard.set_text(text).map_err(|_| {
+        PassmanError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Clipboard error",
+        ))
+    })?;
     Ok(())
 }
 
 fn print_usage() {
-    println!("Passman password manager");
-    println!("Usage:");
-    println!("  new [service]                 - Create new password for a service");
-    println!("  get [service]                 - Get a password for a service");
-    println!("  register [service] [password] - Register existing password for a service");
-    println!("  list                          - List all passwords files in password folder");
-    println!("  help                          - Show this help message\n");
-    println!("Examples:");
-    println!("  passman new github");
-    println!("  passman register");
+    println!("Passman - Secure Password Manager");
+    println!();
+    println!("USAGE:");
+    println!("    passman <COMMAND> [OPTIONS]");
+    println!();
+    println!("COMMANDS:");
+    println!("    new [service]                 Create new random password");
+    println!("    get [service]                 Retrieve password (copies to clipboard)");
+    println!("    register [service] [password] Register existing password");
+    println!("    update [service] [password]   Update existing password");
+    println!("    delete [service]              Delete a password");
+    println!("    list                          List all stored services");
+    println!("    search <pattern>              Search for services by name");
+    println!("    help                          Show this help message");
+    println!();
+    println!("EXAMPLES:");
+    println!("    passman new github");
+    println!("    passman get github");
+    println!("    passman register gmail mypassword123");
+    println!("    passman update github");
+    println!("    passman search git");
+    println!("    passman delete oldservice");
+    println!();
+    println!("NOTES:");
+    println!("    - Master password is required on first use");
+    println!("    - Passwords are automatically copied to clipboard");
+    println!("    - Service names must match exactly for retrieval");
 }
 
-struct Command {
-    name: String,
-    service: Option<String>,
-    existing_password: Option<String>,
-}
+fn handle_error(error: PassmanError) {
+    let message = match error {
+        PassmanError::IoError(_) => "File access error. Check permissions and try again.",
+        PassmanError::ChaChaPoly(_) => "Encryption error. Wrong master password?",
+        PassmanError::Base64Decode(_) => "Invalid password file format.",
+        PassmanError::FromUtf8(_) => "Invalid password file contents.",
+        PassmanError::Argon2(_) => "Password hashing error.",
+        PassmanError::InvalidFileFormat => "aaa",
+        PassmanError::UnsupportedVersion => "bbb", // TODO: Add these error variants to PassmanError enum
+                                                   // PassmanError::ClipboardError => "Failed to copy to clipboard.",
+                                                   // PassmanError::InvalidInput => "Invalid input provided.",
+                                                   // PassmanError::ServiceNotFound => "Service not found.",
+                                                   // PassmanError::InvalidFileFormat => "Invalid password file format.",
+    };
 
-impl Command {
-    fn new(args: &[String]) -> Command {
-        let name = args[1].clone();
-        let service = if args.len() > 2 {
-            Some(args[2].clone())
-        } else {
-            None
-        };
-        let existing_password = if args.len() > 3 {
-            Some(args[3].clone())
-        } else {
-            None
-        };
-
-        Command {
-            name,
-            service,
-            existing_password,
-        }
-    }
+    eprintln!("Error: {}", message);
 }
 
 fn run_command(command: Command) -> Result<(), PassmanError> {
+    // Create session - master password prompted once here
+    let session = PassmanSession::new()?;
+
     match command.name.as_str() {
-        "new" => create_new_password(command)?,
-        "get" => get_password(command)?,
-        "register" => register_password(command)?,
-        "list" => list_files()?,
-        "help" => print_usage(),
-        _ => {
-            println!("Unknown command: {}", command.name.as_str());
+        "new" => session.create_password(command.service),
+        "get" => session.get_password(command.service),
+        "register" => session.register_password(command.service, command.extra_arg),
+        "update" => session.update_password(command.service, command.extra_arg),
+        "delete" | "del" | "rm" => session.delete_service(command.service),
+        "list" | "ls" => session.list_services(),
+        "help" | "--help" | "-h" => {
             print_usage();
-            return Ok(());
+            Ok(())
+        }
+        _ => {
+            println!("Unknown command: '{}'", command.name);
+            println!("Use 'passman help' for usage information.");
+            Ok(())
         }
     }
-
-    Ok(())
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect(); // skip binary name
+    let args: Vec<String> = env::args().collect();
 
     if args.len() == 1 {
-        // if no args
         print_usage();
         return;
     }
 
-    let command = Command::new(&args);
+    let command = match Command::parse(&args) {
+        Ok(cmd) => cmd,
+        Err(_) => {
+            print_usage();
+            return;
+        }
+    };
 
-    match run_command(command) {
-        Ok(_) => (),
-        Err(err) => match err {
-            PassmanError::IoError(_) => {
-                println!("Error accessing the file (Io Error).")
-            }
-            PassmanError::ChaChaPoly(_) => {
-                println!("Encryption error. Wrong password?")
-            }
-            PassmanError::Base64Decode(_) => {
-                println!("Base64 decoding error: Invalid base64 in password file")
-            }
-            PassmanError::FromUtf8(_) => {
-                println!("Error converting to Utf8. Invalid base64 contents?")
-            }
-            PassmanError::Argon2(_) => {
-                println!("Error hashing the password. Invalid salt or nonce?")
-            }
-        },
+    if let Err(error) = run_command(command) {
+        handle_error(error);
+        std::process::exit(1);
     }
 }
