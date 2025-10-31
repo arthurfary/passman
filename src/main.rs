@@ -59,7 +59,7 @@ impl PassmanSession {
             }
             None => {
                 // Show all services and let user choose
-                let services = self.storage.list_services()?;
+                let services = list_services()?;
                 if services.is_empty() {
                     println!("No passwords stored yet. Use 'new' to create one.");
                     return Ok(());
@@ -168,23 +168,6 @@ impl PassmanSession {
         Ok(())
     }
 
-    /// List all stored services
-    pub fn list_services(&self) -> Result<(), PassmanError> {
-        let services = self.storage.list_services()?;
-
-        if services.is_empty() {
-            println!("No passwords stored yet. Use 'new' to create one.");
-            return Ok(());
-        }
-
-        println!("Stored services ({}):", services.len());
-        for (i, service) in services.iter().enumerate() {
-            println!("  {}. {}", i + 1, service);
-        }
-
-        Ok(())
-    }
-
     // Helper method for interactive selection
     fn select_from_list(&self, services: Vec<String>) -> Result<String, PassmanError> {
         println!("Available services:");
@@ -247,6 +230,30 @@ impl Command {
 }
 
 // Utility functions
+
+fn list_services() -> Result<Vec<String>, PassmanError> {
+    let storage_path = PassmanStorage::get_default_path();
+    let mut services = Vec::new();
+
+    if !storage_path.exists() {
+        return Ok(services);
+    }
+
+    let entries = std::fs::read_dir(&storage_path)?;
+
+    for entry in entries {
+        let entry = entry?;
+        if let Some(name) = entry.file_name().to_str() {
+            services.push(name.to_string());
+        }
+    }
+
+    return Ok(services);
+    // println!("Stored services ({}):", services.len());
+    // for (i, service) in services.iter().enumerate() {
+    //     println!("  {}. {}", i + 1, service);
+    // }
+}
 
 fn read_input(prompt: &str, is_password: bool) -> Result<String, PassmanError> {
     print!("{}: ", prompt);
@@ -376,20 +383,47 @@ fn handle_error(error: PassmanError) {
 }
 
 fn run_command(command: Command) -> Result<(), PassmanError> {
-    // Create session - master password prompted once here
-    let session = PassmanSession::new()?;
-
     match command.name.as_str() {
-        "new" => session.create_password(command.service),
-        "get" => session.get_password(command.service),
-        "register" => session.register_password(command.service, command.extra_arg),
-        "update" => session.update_password(command.service, command.extra_arg),
-        "delete" | "del" | "rm" => session.delete_service(command.service),
-        "list" | "ls" => session.list_services(),
+        // Commands that don't need authentication
+        "list" | "ls" => {
+            let services = list_services()?;
+            println!("Stored services ({}):", services.len());
+            for (i, service) in services.iter().enumerate() {
+                println!("  {}. {}", i + 1, service);
+            }
+            Ok(())
+        }
         "help" | "--help" | "-h" => {
             print_usage();
             Ok(())
         }
+        "search" => {
+            // If you implement search later
+            let pattern = command.service.unwrap_or_default();
+            let services = list_services()?
+                .into_iter()
+                .filter(|s| s.contains(&pattern))
+                .collect::<Vec<_>>();
+            println!("Found {} matching services:", services.len());
+            for service in services {
+                println!("  - {}", service);
+            }
+            Ok(())
+        }
+
+        // Commands that need authentication - create session only here
+        "new" | "get" | "register" | "update" | "delete" | "del" | "rm" => {
+            let session = PassmanSession::new()?;
+            match command.name.as_str() {
+                "new" => session.create_password(command.service),
+                "get" => session.get_password(command.service),
+                "register" => session.register_password(command.service, command.extra_arg),
+                "update" => session.update_password(command.service, command.extra_arg),
+                "delete" | "del" | "rm" => session.delete_service(command.service),
+                _ => unreachable!(),
+            }
+        }
+
         _ => {
             println!("Unknown command: '{}'", command.name);
             println!("Use 'passman help' for usage information.");

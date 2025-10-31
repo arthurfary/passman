@@ -52,21 +52,6 @@ impl PassmanStorage {
         }
     }
 
-    /// List all stored services
-    pub fn list_services(&self) -> Result<Vec<String>, PassmanError> {
-        let entries = read_dir(&self.storage_path)?;
-        let mut services = Vec::new();
-
-        for entry in entries {
-            let entry = entry?;
-            if let Some(name) = entry.file_name().to_str() {
-                services.push(name.to_string());
-            }
-        }
-
-        Ok(services)
-    }
-
     /// Check if a service exists
     pub fn has_service(&self, service_name: &str) -> bool {
         self.get_service_file_path(service_name).exists()
@@ -133,8 +118,6 @@ impl PassmanStorage {
         file_data.extend_from_slice(&kdf_params.p_cost.to_le_bytes());
         file_data.push(ENCRYPTION_CHACHA20POLY1305);
         file_data.extend_from_slice(&nonce);
-
-        print!("nonce: {:?}", &nonce);
 
         // Write the encrypted body (ciphertext and tag are combined)
         file_data.extend_from_slice(&encrypted_content);
