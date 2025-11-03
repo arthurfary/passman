@@ -1,16 +1,16 @@
 use argon2::Version;
 use chacha20poly1305::aead::generic_array::GenericArray;
 use dirs::home_dir;
-use std::fs::{File, create_dir_all, read_dir};
+use std::fs::{File, create_dir_all};
 use std::io::prelude::*;
 use std::io::{Cursor, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::error::PassmanError;
 use crate::passman_encryption::{self, KdfParameters};
 use chacha20poly1305::aead::Aead;
 
-const FILE_MAGIC_NUMBER: &[u8; 4] = b"PMAN"; // 'PassMan'
+const FILE_MAGIC_NUMBER: &[u8; 4] = b"PMAN";
 const CURRENT_FILE_VERSION: u8 = 0x01;
 const KDF_ARGON2ID: u8 = 0x01;
 const ENCRYPTION_CHACHA20POLY1305: u8 = 0x01;
@@ -21,7 +21,6 @@ pub struct PassmanStorage {
 }
 
 impl PassmanStorage {
-    // ... (unchanged public methods)
     pub fn new(master_password: String) -> Self {
         Self {
             master_password,
@@ -29,7 +28,6 @@ impl PassmanStorage {
         }
     }
 
-    /// Create storage with custom path
     pub fn with_path(master_password: String, storage_path: PathBuf) -> Self {
         Self {
             master_password,
@@ -37,7 +35,6 @@ impl PassmanStorage {
         }
     }
 
-    /// Get the default storage path based on OS
     pub fn get_default_path() -> PathBuf {
         match home_dir() {
             Some(mut path) => {
@@ -52,18 +49,10 @@ impl PassmanStorage {
         }
     }
 
-    /// Check if a service exists
     pub fn has_service(&self, service_name: &str) -> bool {
         self.get_service_file_path(service_name).exists()
     }
 
-    /// Delete a service
-    pub fn delete_service(&self, service_name: &str) -> Result<(), PassmanError> {
-        let file_path = self.get_service_file_path(service_name);
-        std::fs::remove_file(file_path)?;
-        Ok(())
-    }
-    // Store encrypted content for a service
     pub fn store(&self, service_name: &str, content: &String) -> Result<(), PassmanError> {
         self.ensure_storage_dir()?;
 
@@ -78,7 +67,6 @@ impl PassmanStorage {
         Ok(())
     }
 
-    // Retrieve and decrypt content for a service
     pub fn retrieve(&self, service_name: &str) -> Result<String, PassmanError> {
         let file_path = self.get_service_file_path(service_name);
         let mut file = File::open(file_path)?;
@@ -88,8 +76,6 @@ impl PassmanStorage {
         self.decrypt_content(&content)
     }
 
-    // Private helper methods
-    // ... (unchanged private methods)
     fn ensure_storage_dir(&self) -> Result<(), PassmanError> {
         create_dir_all(&self.storage_path)?;
         Ok(())
@@ -170,7 +156,6 @@ impl PassmanStorage {
 
         let mut encryption_type_byte = [0u8; 1];
         cursor.read_exact(&mut encryption_type_byte)?;
-        // For now, we only support ChaCha20Poly1305.
         if encryption_type_byte[0] != ENCRYPTION_CHACHA20POLY1305 {
             return Err(PassmanError::InvalidFileFormat);
         }
@@ -178,7 +163,6 @@ impl PassmanStorage {
         let mut nonce = [0u8; 12];
         cursor.read_exact(&mut nonce)?;
 
-        // Read the encrypted body
         let mut encrypted_content = Vec::new();
         cursor.read_to_end(&mut encrypted_content)?;
 
