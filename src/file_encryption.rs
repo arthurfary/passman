@@ -24,7 +24,7 @@ impl PassmanStorage {
     pub fn new(master_password: String) -> Self {
         Self {
             master_password,
-            storage_path: Self::get_default_path(),
+            storage_path: PathBuf::from("./PassmanPasswords/"),
         }
     }
 
@@ -36,17 +36,7 @@ impl PassmanStorage {
     }
 
     pub fn get_default_path() -> PathBuf {
-        match home_dir() {
-            Some(mut path) => {
-                path.push(if cfg!(windows) {
-                    "Passwords"
-                } else {
-                    ".passwords"
-                });
-                path
-            }
-            None => PathBuf::from("."),
-        }
+        PathBuf::from("./PassmanPasswords/")
     }
 
     pub fn has_service(&self, service_name: &str) -> bool {
@@ -58,8 +48,6 @@ impl PassmanStorage {
 
         let file_path = self.get_service_file_path(service_name);
         let encrypted_data = self.encrypt_content(content.as_bytes())?;
-
-        print!("{:?}", file_path);
 
         let mut file = File::create(file_path)?;
         file.write_all(&encrypted_data)?;
