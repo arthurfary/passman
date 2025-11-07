@@ -1,9 +1,10 @@
 use argon2::Version;
 use chacha20poly1305::aead::generic_array::GenericArray;
-use std::fs::{File, create_dir_all};
+use std::fs::{self, File, create_dir_all};
 use std::io::prelude::*;
 use std::io::{Cursor, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::env;
 
 use crate::crypto::{self, KdfParameters};
 use crate::error::PassmanError;
@@ -20,10 +21,25 @@ pub struct PassmanStorage {
 }
 
 impl PassmanStorage {
+     pub fn get_default_path() -> PathBuf {
+        let exe_dir = env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+        
+        let storage_dir = exe_dir.join("PassmanPasswords");
+
+        if let Err(e) = create_dir_all(&storage_dir) {
+            eprintln!("Warning: failed to create storage folder: {}", e);
+        }
+
+        fs::canonicalize(&storage_dir).unwrap_or(storage_dir)
+    }
+
     pub fn new(master_password: String) -> Self {
         Self {
             master_password,
-            storage_path: PathBuf::from("./PassmanPasswords/"),
+            storage_path: Self::get_default_path(),
         }
     }
 
@@ -33,10 +49,7 @@ impl PassmanStorage {
             storage_path,
         }
     }
-
-    pub fn get_default_path() -> PathBuf {
-        PathBuf::from("./PassmanPasswords/")
-    }
+   
 
     pub fn has_service(&self, service_name: &str) -> bool {
         self.get_service_file_path(service_name).exists()
