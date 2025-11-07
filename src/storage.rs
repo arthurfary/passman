@@ -1,13 +1,12 @@
 use argon2::Version;
 use chacha20poly1305::aead::generic_array::GenericArray;
-use dirs::home_dir;
 use std::fs::{File, create_dir_all};
 use std::io::prelude::*;
 use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
+use crate::crypto::{self, KdfParameters};
 use crate::error::PassmanError;
-use crate::passman_encryption::{self, KdfParameters};
 use chacha20poly1305::aead::Aead;
 
 const FILE_MAGIC_NUMBER: &[u8; 4] = b"PMAN";
@@ -43,11 +42,18 @@ impl PassmanStorage {
         self.get_service_file_path(service_name).exists()
     }
 
-    pub fn store(&self, service_name: &str, content: &String) -> Result<(), PassmanError> {
+    pub fn store(
+        &self,
+        service_name: &str,
+        content: &String,
+        m_cost: u32,
+        t_cost: u32,
+        p_cost: u32,
+    ) -> Result<(), PassmanError> {
         self.ensure_storage_dir()?;
 
         let file_path = self.get_service_file_path(service_name);
-        let encrypted_data = self.encrypt_content(content.as_bytes())?;
+        let encrypted_data = self.encrypt_content(content.as_bytes(), m_cost, t_cost, p_cost)?;
 
         let mut file = File::create(file_path)?;
         file.write_all(&encrypted_data)?;
@@ -73,9 +79,15 @@ impl PassmanStorage {
         self.storage_path.join(service_name)
     }
 
-    fn encrypt_content(&self, content: &[u8]) -> Result<Vec<u8>, PassmanError> {
+    fn encrypt_content(
+        &self,
+        content: &[u8],
+        m_cost: u32,
+        t_cost: u32,
+        p_cost: u32,
+    ) -> Result<Vec<u8>, PassmanError> {
         let (cipher, kdf_params, nonce) =
-            passman_encryption::gen_new_cipher(self.master_password.as_bytes())?;
+            crypto::gen_new_cipher(self.master_password.as_bytes(), m_cost, t_cost, p_cost)?;
 
         let encrypted_content =
             cipher.encrypt(chacha20poly1305::Nonce::from_slice(&nonce), content)?;
@@ -155,8 +167,7 @@ impl PassmanStorage {
         cursor.read_to_end(&mut encrypted_content)?;
 
         let nonce = GenericArray::clone_from_slice(&nonce);
-        let cipher =
-            passman_encryption::gen_decrypt_cipher(self.master_password.as_bytes(), &kdf_params)?;
+        let cipher = crypto::gen_decrypt_cipher(self.master_password.as_bytes(), &kdf_params)?;
 
         let decrypted_content = cipher.decrypt(&nonce, encrypted_content.as_ref())?;
 

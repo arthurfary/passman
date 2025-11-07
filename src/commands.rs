@@ -1,10 +1,15 @@
-use crate::error::PassmanError;
-use crate::file_encryption::PassmanStorage;
-use crate::passman_utils::{
+use crate::cli::{
     copy_to_clipboard, generate_random_password, list_all_services, print_help,
     prompt_master_password, prompt_master_password_with_text, prompt_service_selection,
 };
+use crate::error::PassmanError;
+use crate::storage::PassmanStorage;
 use std::io;
+
+// Default Argon2 parameters for production use
+const DEFAULT_M_COST: u32 = 65536; // 64 MiB
+const DEFAULT_T_COST: u32 = 10;    // 10 iterations
+const DEFAULT_P_COST: u32 = 2;     // 2 parallel threads
 
 pub struct PassmanSession {
     storage: PassmanStorage,
@@ -23,7 +28,7 @@ impl PassmanSession {
         }
 
         let password = generate_random_password(20);
-        self.storage.store(service, &password)?;
+        self.storage.store(service, &password, DEFAULT_M_COST, DEFAULT_T_COST, DEFAULT_P_COST)?;
 
         copy_to_clipboard(&password)?;
         println!("✓ New password created for '{}'", service);
@@ -167,4 +172,3 @@ fn cmd_list() -> Result<(), PassmanError> {
 
     Ok(())
 }
-

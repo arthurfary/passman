@@ -4,7 +4,6 @@ use std::fmt::{self, Display};
 pub enum PassmanError {
     IoError(std::io::Error),
     ChaChaPoly(chacha20poly1305::Error),
-    Base64Decode(base64::DecodeError),
     FromUtf8(std::string::FromUtf8Error),
     Argon2(argon2::Error),
     InvalidFileFormat,
@@ -19,9 +18,6 @@ impl Display for PassmanError {
             }
             PassmanError::ChaChaPoly(chacha_error) => {
                 write!(f, "{}", chacha_error)
-            }
-            PassmanError::Base64Decode(b64_error) => {
-                write!(f, "{}", b64_error)
             }
             PassmanError::FromUtf8(fromutf8_error) => {
                 write!(f, "{}", fromutf8_error)
@@ -54,12 +50,6 @@ impl From<std::io::Error> for PassmanError {
 impl From<chacha20poly1305::Error> for PassmanError {
     fn from(err: chacha20poly1305::Error) -> Self {
         PassmanError::ChaChaPoly(err)
-    }
-}
-
-impl From<base64::DecodeError> for PassmanError {
-    fn from(err: base64::DecodeError) -> Self {
-        PassmanError::Base64Decode(err)
     }
 }
 

@@ -1,9 +1,11 @@
-use argon2::password_hash::rand_core::RngCore;
-use argon2::{Argon2, Params, Version};
-use chacha20poly1305::aead::{KeyInit, OsRng};
-use chacha20poly1305::{ChaCha20Poly1305, Key};
-
 use crate::error::PassmanError;
+use argon2::{Argon2, Params, Version};
+use chacha20poly1305::aead::KeyInit;
+use chacha20poly1305::{ChaCha20Poly1305, Key};
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
+
+use rand::RngCore;
 
 pub struct KdfParameters {
     pub salt: [u8; 16],
@@ -15,30 +17,28 @@ pub struct KdfParameters {
 
 pub fn gen_new_cipher(
     pwd: &[u8],
+    m_cost: u32,
+    t_cost: u32,
+    p_cost: u32,
 ) -> Result<(ChaCha20Poly1305, KdfParameters, [u8; 12]), PassmanError> {
+    let mut rng = ChaCha20Rng::from_os_rng();
+
     let mut random_salt = [0u8; 16];
-    OsRng.fill_bytes(&mut random_salt);
+    rng.fill_bytes(&mut random_salt);
 
     let mut nonce = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce);
-
-    // Hardcoded Argon2 parameters for demonstration.
-    // Consider making these configurable in a future version.
-    let argon2_version = Version::V0x13;
-    let m_cost = 65536; // Memory cost
-    let t_cost = 10; // Time cost
-    let p_cost = 2; // Parallelism
+    rng.fill_bytes(&mut nonce);
 
     let kdf_params = KdfParameters {
         salt: random_salt,
-        version: argon2_version,
+        version: Version::V0x13,
         m_cost,
         t_cost,
         p_cost,
     };
 
     let params = Params::new(m_cost, t_cost, p_cost, None)?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2_version, params);
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, Version::V0x13, params);
 
     let mut output_key = [0u8; 32];
     argon2.hash_password_into(pwd, &random_salt, &mut output_key)?;

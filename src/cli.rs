@@ -1,5 +1,5 @@
 use crate::error::PassmanError;
-use crate::file_encryption::PassmanStorage;
+use crate::storage::PassmanStorage;
 use arboard::Clipboard;
 use rand::Rng;
 use std::io::{self, Write};
@@ -125,4 +125,3 @@ pub fn print_help() {
     println!("    passman get              # Interactive selection");
     println!("    passman list");
 }
-
