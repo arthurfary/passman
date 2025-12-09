@@ -4,9 +4,10 @@ use std::fmt::{self, Display};
 pub enum PassmanError {
     IoError(std::io::Error),
     ChaChaPoly(chacha20poly1305::Error),
-    Base64Decode(base64::DecodeError),
     FromUtf8(std::string::FromUtf8Error),
     Argon2(argon2::Error),
+    InvalidFileFormat,
+    UnsupportedVersion,
 }
 
 impl Display for PassmanError {
@@ -18,24 +19,29 @@ impl Display for PassmanError {
             PassmanError::ChaChaPoly(chacha_error) => {
                 write!(f, "{}", chacha_error)
             }
-            PassmanError::Base64Decode(b64_error) => {
-                write!(f, "{}", b64_error)
-            }
             PassmanError::FromUtf8(fromutf8_error) => {
                 write!(f, "{}", fromutf8_error)
             }
             PassmanError::Argon2(argon2_error) => {
                 write!(f, "{}", argon2_error)
             }
+            PassmanError::InvalidFileFormat => {
+                write!(
+                    f,
+                    "Invalid file format: Header check failed or file is corrupted."
+                )
+            }
+            PassmanError::UnsupportedVersion => {
+                write!(f, "Unsupported file version.")
+            }
         }
     }
 }
 
-impl std::error::Error for PassmanError {} // Make it an error
+impl std::error::Error for PassmanError {}
 
 // convert std io error to IoError
 impl From<std::io::Error> for PassmanError {
-    // return type is self -> PassmanError
     fn from(err: std::io::Error) -> Self {
         PassmanError::IoError(err)
     }
@@ -44,12 +50,6 @@ impl From<std::io::Error> for PassmanError {
 impl From<chacha20poly1305::Error> for PassmanError {
     fn from(err: chacha20poly1305::Error) -> Self {
         PassmanError::ChaChaPoly(err)
-    }
-}
-
-impl From<base64::DecodeError> for PassmanError {
-    fn from(err: base64::DecodeError) -> Self {
-        PassmanError::Base64Decode(err)
     }
 }
 

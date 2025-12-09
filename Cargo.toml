@@ -5,10 +5,30 @@ name = "passman"
 version = "0.2.0"
 edition = "2024"
 
+[[bin]]
+name = "passman"
+path = "src/main.rs"
+
+[[bin]]
+name = "passman-gui"
+path = "src/main_gui.rs"
+
 [dependencies]
-argon2 = "0.5.3"
-base64 = "0.22.1"
-chacha20poly1305 = "0.10.1"
-cli-clipboard = "0.4.0"
-rand = "0.9.1"
-rpassword = "7.4.0"
+# Cryptography
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+rand = "0.9"
+rand_chacha = "0.9"
+
+# CLI utilities
+arboard = "3.6"
+rpassword = "7.4"
+
+# GUI framework
+iced = { version = "0.13", features = ["tokio"] }
+eframe = "0.33.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
