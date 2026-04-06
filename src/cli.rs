@@ -3,24 +3,33 @@ use crate::storage::PassmanStorage;
 use arboard::Clipboard;
 use rand::Rng;
 use std::io::{self, Write};
+use std::process::{Command, Stdio};
 
 pub fn list_all_services() -> Result<Vec<String>, PassmanError> {
     let storage_path = PassmanStorage::get_default_path();
-
     if !storage_path.exists() {
         return Ok(Vec::new());
     }
-
     let mut services = Vec::new();
     let entries = std::fs::read_dir(&storage_path)?;
-
     for entry in entries {
         let entry = entry?;
+        let path = entry.path();
+
+        // Skip anything that isn't a file
+        if !path.is_file() {
+            continue;
+        }
+
+        // Skip files that have an extension
+        if path.extension().is_some() {
+            continue;
+        }
+
         if let Some(name) = entry.file_name().to_str() {
             services.push(name.to_string());
         }
     }
-
     services.sort();
     Ok(services)
 }
@@ -30,7 +39,6 @@ pub fn prompt_service_selection(services: &[String]) -> Result<String, PassmanEr
     for (i, service) in services.iter().enumerate() {
         println!("  {}. {}", i + 1, service);
     }
-
     let input = prompt_input("Enter number", false)?;
     let index: usize = input.trim().parse().map_err(|_| {
         PassmanError::IoError(io::Error::new(
@@ -38,21 +46,18 @@ pub fn prompt_service_selection(services: &[String]) -> Result<String, PassmanEr
             "Invalid number",
         ))
     })?;
-
     if index == 0 || index > services.len() {
         return Err(PassmanError::IoError(io::Error::new(
             io::ErrorKind::InvalidInput,
             "Number out of range",
         )));
     }
-
     Ok(services[index - 1].clone())
 }
 
 pub fn prompt_input(message: &str, is_password: bool) -> Result<String, PassmanError> {
     print!("{}: ", message);
     io::stdout().flush()?;
-
     let input = if is_password {
         rpassword::read_password()?
     } else {
@@ -60,7 +65,6 @@ pub fn prompt_input(message: &str, is_password: bool) -> Result<String, PassmanE
         io::stdin().read_line(&mut buffer)?;
         buffer
     };
-
     Ok(input.trim().to_string())
 }
 
@@ -70,21 +74,18 @@ pub fn prompt_master_password() -> Result<String, PassmanError> {
 
 pub fn prompt_master_password_with_text(text: &str) -> Result<String, PassmanError> {
     let password = prompt_input(text, true)?;
-
     if password.is_empty() {
         return Err(PassmanError::IoError(io::Error::new(
             io::ErrorKind::InvalidInput,
             "Master password cannot be empty",
         )));
     }
-
     Ok(password)
 }
 
 pub fn generate_random_password(length: usize) -> String {
     const CHARSET: &[u8] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
-
     let mut rng = rand::rng();
     (0..length)
         .map(|_| CHARSET[rng.random_range(0..CHARSET.len())] as char)
@@ -92,20 +93,65 @@ pub fn generate_random_password(length: usize) -> String {
 }
 
 pub fn copy_to_clipboard(text: &str) -> Result<(), PassmanError> {
+    // On Wayland, arboard loses clipboard contents when the process exits
+    // because the clipboard owner must stay alive to serve paste requests.
+    // wl-copy daemonizes itself and keeps the content alive, so we prefer it.
+    if std::env::var("WAYLAND_DISPLAY").is_ok() {
+        return copy_to_clipboard_wayland(text);
+    }
+
+    // X11 / other: arboard works fine
+    copy_to_clipboard_arboard(text)
+}
+
+fn copy_to_clipboard_wayland(text: &str) -> Result<(), PassmanError> {
+    let mut child = Command::new("wl-copy")
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            PassmanError::IoError(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to spawn wl-copy (is wl-clipboard installed?): {}", e),
+            ))
+        })?;
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(text.as_bytes())
+        .map_err(|e| {
+            PassmanError::IoError(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to write to wl-copy stdin: {}", e),
+            ))
+        })?;
+
+    // Spawn a background thread to kill wl-copy after the timeout.
+    // When wl-copy dies, the clipboard is cleared automatically.
+    let timeout = std::time::Duration::from_secs(30);
+    std::thread::spawn(move || {
+        std::thread::sleep(timeout);
+        let _ = child.kill();
+        let _ = child.wait(); // reap the zombie process
+    });
+
+    Ok(())
+}
+
+fn copy_to_clipboard_arboard(text: &str) -> Result<(), PassmanError> {
     let mut clipboard = Clipboard::new().map_err(|e| {
         PassmanError::IoError(io::Error::new(
             io::ErrorKind::Other,
             format!("Failed to access clipboard: {}", e),
         ))
     })?;
-
     clipboard.set_text(text).map_err(|e| {
         PassmanError::IoError(io::Error::new(
             io::ErrorKind::Other,
             format!("Failed to copy to clipboard: {}", e),
         ))
     })?;
-
     Ok(())
 }
 

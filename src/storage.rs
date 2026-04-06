@@ -21,19 +21,88 @@ pub struct PassmanStorage {
 }
 
 impl PassmanStorage {
-     pub fn get_default_path() -> PathBuf {
-        let exe_dir = env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-            .unwrap_or_else(|| PathBuf::from("."));
-        
-        let storage_dir = exe_dir.join("PassmanPasswords");
-
-        if let Err(e) = create_dir_all(&storage_dir) {
-            eprintln!("Warning: failed to create storage folder: {}", e);
+    pub fn get_default_path() -> PathBuf {
+        // 1. Env var override — highest priority
+        if let Ok(custom_path) = env::var("PASSMAN_STORAGE_DIR") {
+            let path = PathBuf::from(custom_path);
+            if let Err(e) = create_dir_all(&path) {
+                eprintln!("Warning: failed to create custom storage folder: {}", e);
+            }
+            return fs::canonicalize(&path).unwrap_or(path);
         }
 
-        fs::canonicalize(&storage_dir).unwrap_or(storage_dir)
+        // 2. Config file override — second priority
+        if let Some(config_path) = Self::read_config_path() {
+            if let Err(e) = create_dir_all(&config_path) {
+                eprintln!("Warning: failed to create configured storage folder: {}", e);
+            }
+            return fs::canonicalize(&config_path).unwrap_or(config_path);
+        }
+
+        // 3. Platform default — fallback
+        let base = Self::platform_default_dir();
+        if let Err(e) = create_dir_all(&base) {
+            eprintln!("Warning: failed to create default storage folder: {}", e);
+        }
+        fs::canonicalize(&base).unwrap_or(base)
+    }
+
+    fn platform_default_dir() -> PathBuf {
+        #[cfg(target_os = "windows")]
+        {
+            // %APPDATA%\Passman  (e.g. C:\Users\Alice\AppData\Roaming\Passman)
+            env::var("APPDATA")
+                .map(|p| PathBuf::from(p).join("Passman"))
+                .unwrap_or_else(|_| PathBuf::from(".").join("Passman"))
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // $XDG_DATA_HOME/passman  or  ~/.local/share/passman
+            let base = env::var("XDG_DATA_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| {
+                    env::var("HOME")
+                        .map(|h| PathBuf::from(h).join(".local").join("share"))
+                        .unwrap_or_else(|_| PathBuf::from("."))
+                });
+            base.join("passman")
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // ~/Library/Application Support/Passman
+            env::var("HOME")
+                .map(|h| {
+                    PathBuf::from(h)
+                        .join("Library")
+                        .join("Application Support")
+                        .join("Passman")
+                })
+                .unwrap_or_else(|_| PathBuf::from(".").join("Passman"))
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            PathBuf::from(".").join("passman")
+        }
+    }
+
+    fn read_config_path() -> Option<PathBuf> {
+        let config_file = env::current_exe()
+            .ok()?
+            .parent()?
+            .to_path_buf()
+            .join("passman.conf");
+
+        let content = fs::read_to_string(config_file).ok()?;
+        let line = content.lines().next()?.trim();
+
+        if line.is_empty() {
+            return None;
+        }
+
+        Some(PathBuf::from(line))
     }
 
     pub fn new(master_password: String) -> Self {
@@ -49,7 +118,6 @@ impl PassmanStorage {
             storage_path,
         }
     }
-   
 
     pub fn has_service(&self, service_name: &str) -> bool {
         self.get_service_file_path(service_name).exists()
